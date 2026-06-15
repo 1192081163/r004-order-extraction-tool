@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+
+# Local build artifacts
+build/
+dist/
+*.spec.bak
+*.zip
+
+# Local app/runtime logs
+*.log
+outputs/
+
+# Local analysis helpers that depend on generated audit outputs
+build_problem_orders_tool.py
+build_special_template_queue.py
+
+# Business/order data and generated spreadsheets
+order_excels_dedup/
+*.xlsx
+*.xlsm
+*.xls
+*.csv
+!rules/*.csv
+
+# Tests that depend on local business sample files
+tests/test_extract_rules.py
+
+# macOS
+.DS_Store
+
+# CodeGraph local index
+.codegraph/
