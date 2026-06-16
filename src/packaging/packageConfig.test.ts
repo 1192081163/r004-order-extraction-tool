@@ -43,11 +43,21 @@ describe("Electron packaging configuration", () => {
   test("release workflow builds only the Windows Electron artifact", async () => {
     const workflow = await readFile(path.join(root, ".github/workflows/release.yml"), "utf8");
 
+    expect(workflow).toContain("branches:");
+    expect(workflow).toContain("- main");
+    expect(workflow).toContain("FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true");
+    expect(workflow).toContain('NODE_VERSION: "24"');
+    expect(workflow).toContain("actions/checkout@v6");
+    expect(workflow).toContain("actions/setup-node@v6");
+    expect(workflow).toContain("actions/setup-python@v6");
     expect(workflow).toContain("npm ci");
     expect(workflow).toContain("actions/setup-python");
     expect(workflow).toContain("requirements-python-runner.txt");
     expect(workflow).toContain("scripts/build-python-runner-win.ps1");
     expect(workflow).toContain("npm run dist:win");
+    expect(workflow).toContain('tag="build-${GITHUB_RUN_NUMBER}"');
+    expect(workflow).toContain("gh release create");
+    expect(workflow).toContain("--latest");
     expect(workflow).not.toContain("npm run dist:mac");
     expect(workflow).not.toContain("build-macos");
     expect(workflow).not.toContain("macos-dmg");

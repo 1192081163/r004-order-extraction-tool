@@ -39,20 +39,19 @@ GitHub Release 会直接提供：
 order-organizer-assistant-windows.exe
 ```
 
-同一个版本重新运行 Release workflow 时，会覆盖 Release 里的同名文件。
+每次推送到 `main` 后，GitHub Actions 会自动生成一个新的 `build-运行号` Release，并把同名 Windows 安装包标记为 Latest。
 
 Release 构建现在走 Electron / TypeScript 链路，并只打包 Windows 安装程序。CI 会用 PyInstaller 生成一个很小的 Python 规则运行器，随 Electron 应用一起内置；不再打包旧的 Python 桌面程序，也不做 macOS 包。
 
 ### 发布新版本
 
-推送版本标签后会自动测试、打包并上传 Release：
+推送到 `main` 后会自动测试、打包并上传 Latest Release：
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git push origin main
 ```
 
-也可以在 GitHub Actions 的 `Build Release` 工作流里手动运行，输入同一个 tag 会覆盖该版本的 `.exe`。
+也可以在 GitHub Actions 的 `Build Release` 工作流里手动运行。手动运行如果选择 `main` 分支，同样会创建一个新的 `build-运行号` Release。
 
 ## Windows 本地打包
 

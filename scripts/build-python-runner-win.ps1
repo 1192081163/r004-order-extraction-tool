@@ -6,6 +6,8 @@ Set-Location $repoRoot
 $helperDir = Join-Path $repoRoot "python-helper"
 $workDir = Join-Path $repoRoot "build/python-runner"
 $specDir = Join-Path $repoRoot "build"
+$rulesDir = Join-Path $repoRoot "rules"
+$bridgePath = Join-Path $repoRoot "python_extraction_bridge.py"
 
 if (Test-Path $helperDir) {
     Remove-Item $helperDir -Recurse -Force
@@ -22,5 +24,5 @@ python -m PyInstaller `
     --distpath $helperDir `
     --workpath $workDir `
     --specpath $specDir `
-    --add-data "rules;rules" `
-    "python_extraction_bridge.py"
+    --add-data "$rulesDir;rules" `
+    $bridgePath
