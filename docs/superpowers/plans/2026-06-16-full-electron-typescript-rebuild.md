@@ -321,4 +321,4 @@ Use Node/npm CI, install Python runner dependencies, build the Windows Python ru
 
 - [x] **Step 4: Verify local Windows package**
 
-Run `npm run dist:win` and confirm `release/order-organizer-assistant-windows.exe` is produced.
+Run `npm run dist:win` and confirm `release/orderflow-desktop-windows.exe` is produced.

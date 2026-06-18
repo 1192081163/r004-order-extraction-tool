@@ -22,7 +22,7 @@ describe("update checker", () => {
     const result = updateInfoFromReleasePayload(
       {
         tag_name: "v1.2.0",
-        html_url: "https://github.com/1192081163/r004-order-extraction-tool/releases/tag/v1.2.0",
+        html_url: "https://github.com/1192081163/orderflow-desktop/releases/tag/v1.2.0",
         assets: [{ name: WINDOWS_ASSET_NAME, browser_download_url: "https://download.example/app.exe" }],
       },
       "1.0.0",
@@ -89,7 +89,7 @@ describe("update checker", () => {
   });
 
   test("downloads update executable to a unique local path", async () => {
-    const downloadDir = await mkdtemp(path.join(os.tmpdir(), "r004-update-"));
+    const downloadDir = await mkdtemp(path.join(os.tmpdir(), "orderflow-update-"));
     tempDirs.push(downloadDir);
     await writeFile(path.join(downloadDir, WINDOWS_ASSET_NAME), "old executable");
 
@@ -105,18 +105,18 @@ describe("update checker", () => {
       downloadDir,
       async (url, init) => {
         expect(url).toBe("https://download.example/app.exe");
-        expect(JSON.stringify(init?.headers)).toContain("order-organizer-assistant/");
+      expect(JSON.stringify(init?.headers)).toContain("orderflow-desktop/");
         return new Response(new TextEncoder().encode("new executable"));
       },
     );
 
-    expect(path.basename(executablePath)).toBe("order-organizer-assistant-windows-1.exe");
+    expect(path.basename(executablePath)).toBe("orderflow-desktop-windows-1.exe");
     expect(await readFile(executablePath, "utf8")).toBe("new executable");
     await expect(access(`${executablePath}.download`)).rejects.toBeTruthy();
   });
 
   test("rejects executable download when release has no downloadable asset", async () => {
-    const downloadDir = await mkdtemp(path.join(os.tmpdir(), "r004-update-"));
+    const downloadDir = await mkdtemp(path.join(os.tmpdir(), "orderflow-update-"));
     tempDirs.push(downloadDir);
 
     await expect(

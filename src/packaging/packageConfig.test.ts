@@ -7,9 +7,17 @@ const root = process.cwd();
 describe("Electron packaging configuration", () => {
   test("package scripts build the Windows artifact with electron-builder", async () => {
     const packageJson = JSON.parse(await readFile(path.join(root, "package.json"), "utf8")) as {
+      name?: string;
+      description?: string;
       author?: string;
       scripts: Record<string, string>;
       devDependencies: Record<string, string>;
+      license?: string;
+      repository?: { type?: string; url?: string };
+      homepage?: string;
+      bugs?: { url?: string };
+      keywords?: string[];
+      overrides?: Record<string, string>;
       build?: unknown;
     };
     const tsconfigBuild = JSON.parse(
@@ -20,7 +28,22 @@ describe("Electron packaging configuration", () => {
       exclude?: string[];
     };
 
+    expect(packageJson.name).toBe("orderflow-desktop");
+    expect(packageJson.description).toBe("Electron TypeScript orderflow desktop application");
     expect(packageJson.author).toBe("AUSMET");
+    expect(packageJson.license).toBe("MIT");
+    expect(packageJson.repository).toMatchObject({
+      type: "git",
+      url: "git+https://github.com/1192081163/orderflow-desktop.git",
+    });
+    expect(packageJson.homepage).toBe("https://github.com/1192081163/orderflow-desktop#readme");
+    expect(packageJson.bugs).toMatchObject({
+      url: "https://github.com/1192081163/orderflow-desktop/issues",
+    });
+    expect(packageJson.keywords).toEqual(
+      expect.arrayContaining(["electron", "order-extraction", "excel", "imap"]),
+    );
+    expect(packageJson.overrides).toMatchObject({ uuid: "11.1.1" });
     expect(packageJson.devDependencies).toHaveProperty("electron-builder");
     expect(packageJson.scripts["clean:dist"]).toContain("rmSync('dist'");
     expect(packageJson.scripts.build).toBe("npm run clean:dist && npm run build:main && npm run build:renderer");
@@ -33,7 +56,7 @@ describe("Electron packaging configuration", () => {
     expect(packageJson.scripts["pack:win"]).toBe("electron-builder --win portable --publish never");
     expect(packageJson.scripts).not.toHaveProperty("dist:mac");
     expect(packageJson.build).toMatchObject({
-      appId: "com.ausmet.order-organizer-assistant",
+      appId: "com.ausmet.orderflow.desktop",
       productName: "订单整理助手",
       directories: { output: "release" },
       files: ["dist/**/*", "!dist/**/*.test.js", "package.json"],
@@ -49,7 +72,7 @@ describe("Electron packaging configuration", () => {
       icon: "assets/app_icon.ico",
     },
       portable: {
-        artifactName: "order-organizer-assistant-windows.${ext}",
+        artifactName: "orderflow-desktop-windows.${ext}",
       },
     });
     expect(tsconfigBuild).toMatchObject({
@@ -60,12 +83,15 @@ describe("Electron packaging configuration", () => {
   });
 
   test("release workflow builds only the Windows Electron artifact", async () => {
-    const workflow = await readFile(path.join(root, ".github/workflows/release.yml"), "utf8");
+  const workflow = await readFile(path.join(root, ".github/workflows/release.yml"), "utf8");
 
-    expect(workflow).toContain("branches:");
-    expect(workflow).toContain("- main");
-    expect(workflow).toContain("cancel-in-progress: true");
-    expect(workflow).toContain("FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true");
+  expect(workflow).toContain("branches:");
+  expect(workflow).toContain("- main");
+  expect(workflow).toContain("pull_request:");
+  expect(workflow).toContain("cancel-in-progress: true");
+  expect(workflow).toContain("permissions:\n  contents: read");
+  expect(workflow).toContain("permissions:\n      contents: write");
+  expect(workflow).toContain("FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true");
     expect(workflow).toContain('NODE_VERSION: "24"');
     expect(workflow).toContain("actions/checkout@v6");
     expect(workflow).toContain("actions/setup-node@v6");
@@ -91,13 +117,61 @@ describe("Electron packaging configuration", () => {
     expect(workflow).toContain('tag="build-${GITHUB_RUN_NUMBER}"');
     expect(workflow).toContain("gh release create");
     expect(workflow).toContain("Windows 便携版已自动生成");
-    expect(workflow).toContain("直接下载 order-organizer-assistant-windows.exe");
+    expect(workflow).toContain("直接下载 orderflow-desktop-windows.exe");
     expect(workflow).toContain("--latest");
     expect(workflow).not.toContain("npm run dist:mac");
     expect(workflow).not.toContain("build-macos");
     expect(workflow).not.toContain("macos-dmg");
     expect(workflow).not.toContain("macos.dmg");
-    expect(workflow).not.toContain("requirements-desktop.txt");
-    expect(workflow).not.toContain("desktop_app.py");
-  });
+  expect(workflow).not.toContain("requirements-desktop.txt");
+  expect(workflow).not.toContain("desktop_app.py");
+});
+
+test("CircleCI checks Node, Python, and Windows packaging without publishing", async () => {
+  const config = await readFile(path.join(root, ".circleci/config.yml"), "utf8");
+
+  expect(config).toContain("version: 2.1");
+  expect(config).toContain("node-test:");
+  expect(config).toContain("python-test:");
+  expect(config).toContain("windows-build:");
+  expect(config).toContain("npm ci");
+  expect(config).toContain("npm run typecheck");
+  expect(config).toContain("npm test");
+  expect(config).toContain("python -m pip install -r requirements-python-runner.txt pytest");
+  expect(config).toContain("python -m pytest tests");
+  expect(config).toContain('checksum "rules/builder_aliases.csv"');
+  expect(config).toContain('checksum "rules/china_workdays_2026.csv"');
+  expect(config).toContain('checksum "rules/goods_ignore_patterns.csv"');
+  expect(config).toContain('checksum "rules/wa_public_holidays_2026.csv"');
+  expect(config).toContain("./scripts/build-python-runner-win.ps1");
+  expect(config).toContain("npm run dist:win:ci");
+  expect(config).toContain("store_artifacts:");
+  expect(config).toContain("release/orderflow-desktop-windows.exe");
+  expect(config).toContain("branches:");
+  expect(config).toContain("only:");
+  expect(config).toContain("- main");
+  expect(config).toContain("- master");
+  expect(config).not.toContain("gh release create");
+  expect(config).not.toContain("order-organizer-assistant");
+  expect(config).not.toContain("r004-order-extraction-tool");
+});
+
+test("open source metadata documents license, contributions, and data safety", async () => {
+  const license = await readFile(path.join(root, "LICENSE"), "utf8");
+  const security = await readFile(path.join(root, "SECURITY.md"), "utf8");
+  const contributing = await readFile(path.join(root, "CONTRIBUTING.md"), "utf8");
+  const readme = await readFile(path.join(root, "README.md"), "utf8");
+
+  expect(license).toContain("MIT License");
+  expect(license).toContain("Copyright (c) 2026 AUSMET");
+  expect(security).toContain("不要提交真实订单");
+  expect(security).toContain("邮箱授权码");
+  expect(security).toContain("email_settings.json");
+  expect(contributing).toContain("npm run typecheck");
+  expect(contributing).toContain("python -m pytest tests");
+  expect(readme).toContain("## 开源与许可证");
+  expect(readme).toContain("MIT");
+  expect(readme).toContain("邮箱授权码会保存在本机");
+  expect(readme).toContain("不要提交真实订单");
+});
 });

@@ -1,0 +1,124 @@
+version: 2.1
+
+executors:
+  node-linux:
+    docker:
+      - image: cimg/node:24.10
+
+  python-linux:
+    docker:
+      - image: cimg/python:3.12
+
+jobs:
+  node-test:
+    executor: node-linux
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - npm-v1-{{ checksum "package-lock.json" }}
+            - npm-v1-
+      - run:
+          name: Install Node dependencies
+          command: npm ci
+      - save_cache:
+          key: npm-v1-{{ checksum "package-lock.json" }}
+          paths:
+            - ~/.npm
+      - run:
+          name: Typecheck
+          command: npm run typecheck
+      - run:
+          name: Vitest
+          command: npm test
+
+  python-test:
+    executor: python-linux
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - pip-v1-{{ checksum "requirements-python-runner.txt" }}
+            - pip-v1-
+      - run:
+          name: Install Python test dependencies
+          command: python -m pip install -r requirements-python-runner.txt pytest
+      - save_cache:
+          key: pip-v1-{{ checksum "requirements-python-runner.txt" }}
+          paths:
+            - ~/.cache/pip
+      - run:
+          name: Pytest
+          command: python -m pytest tests
+
+  windows-build:
+    resource_class: windows.medium
+    machine:
+      image: windows-server-2022-gui:current
+      shell: powershell.exe -ExecutionPolicy Bypass
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - windows-npm-v1-{{ checksum "package-lock.json" }}
+            - windows-npm-v1-
+      - restore_cache:
+          keys:
+            - windows-electron-v1-{{ checksum "package-lock.json" }}
+            - windows-electron-v1-
+      - restore_cache:
+          keys:
+            - windows-python-runner-v1-{{ checksum "requirements-python-runner.txt" }}-{{ checksum "python_extraction_bridge.py" }}-{{ checksum "desktop_runner.py" }}-{{ checksum "extract.py" }}-{{ checksum "rules/builder_aliases.csv" }}-{{ checksum "rules/china_workdays_2026.csv" }}-{{ checksum "rules/goods_ignore_patterns.csv" }}-{{ checksum "rules/wa_public_holidays_2026.csv" }}-{{ checksum "scripts/build-python-runner-win.ps1" }}
+            - windows-python-runner-v1-
+      - run:
+          name: Install Node.js and Python
+          command: |
+            choco install nodejs-lts python --yes --no-progress
+            refreshenv
+            node --version
+            npm --version
+            python --version
+      - run:
+          name: Install Node dependencies
+          command: npm ci
+      - save_cache:
+          key: windows-npm-v1-{{ checksum "package-lock.json" }}
+          paths:
+            - C:\Users\circleci\AppData\Local\npm-cache
+      - run:
+          name: Build Python rules runner
+          command: |
+            if (-not (Test-Path python-helper\order-python-runner.exe)) {
+              python -m pip install -r requirements-python-runner.txt
+              ./scripts/build-python-runner-win.ps1
+            }
+      - save_cache:
+          key: windows-python-runner-v1-{{ checksum "requirements-python-runner.txt" }}-{{ checksum "python_extraction_bridge.py" }}-{{ checksum "desktop_runner.py" }}-{{ checksum "extract.py" }}-{{ checksum "rules/builder_aliases.csv" }}-{{ checksum "rules/china_workdays_2026.csv" }}-{{ checksum "rules/goods_ignore_patterns.csv" }}-{{ checksum "rules/wa_public_holidays_2026.csv" }}-{{ checksum "scripts/build-python-runner-win.ps1" }}
+          paths:
+            - python-helper
+      - run:
+          name: Build Windows portable exe
+          command: npm run dist:win:ci
+      - save_cache:
+          key: windows-electron-v1-{{ checksum "package-lock.json" }}
+          paths:
+            - C:\Users\circleci\AppData\Local\electron\Cache
+            - C:\Users\circleci\AppData\Local\electron-builder\Cache
+      - store_artifacts:
+          path: release/orderflow-desktop-windows.exe
+          destination: orderflow-desktop-windows.exe
+
+workflows:
+  checks-and-windows-build:
+    jobs:
+      - node-test
+      - python-test
+      - windows-build:
+          requires:
+            - node-test
+            - python-test
+          filters:
+            branches:
+              only:
+                - main
+                - master

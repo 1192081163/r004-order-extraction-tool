@@ -5,10 +5,14 @@ name: Build Release
     branches:
       - main
       - master
+  pull_request:
+    branches:
+      - main
+      - master
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -17,7 +21,7 @@ concurrency:
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   NODE_VERSION: "24"
-  ASSET_BASENAME: "order-organizer-assistant"
+  ASSET_BASENAME: "orderflow-desktop"
 
 jobs:
   test:
@@ -54,6 +58,7 @@ jobs:
 
   build-windows:
     name: Build Windows Portable EXE
+    if: github.event_name != 'pull_request'
     runs-on: windows-latest
     steps:
       - name: Checkout
@@ -123,6 +128,8 @@ jobs:
       - test
       - build-windows
     if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -142,6 +149,6 @@ jobs:
           gh release create "$tag" \
             "release-assets/${{ env.ASSET_BASENAME }}-windows.exe#${{ env.ASSET_BASENAME }}-windows.exe" \
             --title "订单整理助手 ${tag}" \
-            --notes "Windows 便携版已自动生成。直接下载 order-organizer-assistant-windows.exe，双击即可打开软件，无需安装。" \
+            --notes "Windows 便携版已自动生成。直接下载 orderflow-desktop-windows.exe，双击即可打开软件，无需安装。" \
             --target "$GITHUB_SHA" \
             --latest

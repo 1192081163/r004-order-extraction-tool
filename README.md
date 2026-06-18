@@ -4,10 +4,10 @@
 
 ## 下载 Windows 便携版
 
-普通用户不需要安装 Node.js、Python 或开发依赖。打开 [Latest Release](https://github.com/1192081163/r004-order-extraction-tool/releases/latest)，下载：
+普通用户不需要安装 Node.js、Python 或开发依赖。打开 [Latest Release](https://github.com/1192081163/orderflow-desktop/releases/latest)，下载：
 
 ```text
-order-organizer-assistant-windows.exe
+orderflow-desktop-windows.exe
 ```
 
 下载后双击这个 exe 就会直接打开软件，不会出现安装向导。运行环境已经内置在 exe 中，首次打开后填写企业微信邮箱和邮箱授权码，或直接拖入本地 Excel 文件提取订单。
@@ -61,7 +61,7 @@ npm run dist:win
 打包结果是可直接双击打开的便携版 exe：
 
 ```text
-release/order-organizer-assistant-windows.exe
+release/orderflow-desktop-windows.exe
 ```
 
 ## GitHub Release
@@ -69,7 +69,7 @@ release/order-organizer-assistant-windows.exe
 推送到 `main` 后，GitHub Actions 会自动测试、打包，并创建新的 Latest Release。Release 页面只保留面向用户的 Windows 便携版 exe 下载入口：
 
 ```text
-order-organizer-assistant-windows.exe
+orderflow-desktop-windows.exe
 ```
 
 ## 文件说明
@@ -101,3 +101,28 @@ __pycache__/       可删除的 Python 缓存
 ## 数据安全
 
 仓库默认不包含订单 Excel、输出结果、打包产物和本地日志。把新订单拖进软件处理即可，不需要把订单文件提交到 GitHub。
+
+不要提交真实订单、客户资料、邮箱内容、邮箱授权码、导出的报表或本地打包产物。`.gitignore` 已排除 `data/`、`outputs/`、`reports/`、`build/`、`dist/`、`release/` 和常见 Excel 文件；公开发布时请只从 Git 跟踪文件发布，不要上传整个本地工作目录。
+
+邮箱授权码会保存在本机：
+
+```text
+~/.order_organizer_assistant/email_settings.json
+```
+
+当前版本未使用系统 Keychain 或 Credential Manager。该文件不属于仓库内容，不应提交或上传；如需更强凭据保护，请先改造凭据存储。
+
+## 开源与许可证
+
+本项目使用 MIT 许可证，详见 `LICENSE`。
+
+贡献代码前请运行：
+
+```bash
+npm run typecheck
+npm test
+python -m pytest tests
+npm run build
+```
+
+更多安全和贡献说明见 `SECURITY.md` 和 `CONTRIBUTING.md`。

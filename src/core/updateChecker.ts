@@ -8,8 +8,8 @@ import { CURRENT_RELEASE_TAG } from "./buildInfo.js";
 const require = createRequire(import.meta.url);
 const packageJson = require("../../package.json") as { version?: string };
 
-export const RELEASE_API_URL = "https://api.github.com/repos/1192081163/r004-order-extraction-tool/releases/latest";
-export const WINDOWS_ASSET_NAME = "order-organizer-assistant-windows.exe";
+export const RELEASE_API_URL = "https://api.github.com/repos/1192081163/orderflow-desktop/releases/latest";
+export const WINDOWS_ASSET_NAME = "orderflow-desktop-windows.exe";
 
 interface ReleaseAsset {
   name?: unknown;
@@ -78,7 +78,7 @@ export async function checkForUpdates(fetchImpl = fetch): Promise<UpdateCheckRes
   const currentVersion = packageJson.version ?? "1.0.0";
   try {
     const response = await fetchImpl(RELEASE_API_URL, {
-      headers: { "User-Agent": `order-organizer-assistant/${currentVersion}` },
+      headers: { "User-Agent": `orderflow-desktop/${currentVersion}` },
     });
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
@@ -110,7 +110,7 @@ export async function downloadUpdateExecutable(
   const currentVersion = packageJson.version ?? "1.0.0";
 
   const response = await fetchImpl(update.downloadUrl, {
-    headers: { "User-Agent": `order-organizer-assistant/${currentVersion}` },
+    headers: { "User-Agent": `orderflow-desktop/${currentVersion}` },
   });
   if (!response.ok || !response.body) {
     throw new Error(`新版 exe 下载失败：HTTP ${response.status}`);

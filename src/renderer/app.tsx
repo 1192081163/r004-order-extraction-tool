@@ -808,7 +808,7 @@ function createPreviewApi(): OrderOrganizerApi {
       currentVersion: "preview",
       reason: "current",
     }),
-    downloadAndOpenUpdate: async () => "/preview/downloads/order-organizer-assistant-windows.exe",
+    downloadAndOpenUpdate: async () => "/preview/downloads/orderflow-desktop-windows.exe",
     openPath: async () => undefined,
     onProgress: () => () => undefined,
   };

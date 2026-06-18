@@ -1,8 +1,23 @@
 {
-  "name": "order-organizer-assistant",
+  "name": "orderflow-desktop",
   "version": "1.0.0",
-  "description": "Electron TypeScript order organizer assistant",
+  "description": "Electron TypeScript orderflow desktop application",
   "author": "AUSMET",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/1192081163/orderflow-desktop.git"
+  },
+  "homepage": "https://github.com/1192081163/orderflow-desktop#readme",
+  "bugs": {
+    "url": "https://github.com/1192081163/orderflow-desktop/issues"
+  },
+  "keywords": [
+    "electron",
+    "order-extraction",
+    "excel",
+    "imap"
+  ],
   "main": "dist/main/main.js",
   "type": "module",
   "scripts": {
@@ -39,8 +54,11 @@
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
   },
+  "overrides": {
+    "uuid": "11.1.1"
+  },
   "build": {
-    "appId": "com.ausmet.order-organizer-assistant",
+    "appId": "com.ausmet.orderflow.desktop",
     "productName": "订单整理助手",
     "directories": {
       "output": "release"
@@ -79,7 +97,7 @@
       "icon": "assets/app_icon.ico"
     },
     "portable": {
-      "artifactName": "order-organizer-assistant-windows.${ext}"
+      "artifactName": "orderflow-desktop-windows.${ext}"
     }
   }
 }

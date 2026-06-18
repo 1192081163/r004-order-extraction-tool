@@ -13,10 +13,12 @@ describe("README portable executable guidance", () => {
 
     expect(downloadIndex).toBeGreaterThanOrEqual(0);
     expect(localRunIndex).toBeGreaterThan(downloadIndex);
-    expect(readme).toContain("order-organizer-assistant-windows.exe");
+    expect(readme).toContain("orderflow-desktop-windows.exe");
     expect(readme).toContain("双击这个 exe 就会直接打开软件");
     expect(readme).not.toContain("下载 Windows 安装包");
     expect(readme).not.toContain("双击安装");
     expect(readme).not.toContain("order-extraction-tool-windows.exe");
+    expect(readme).not.toContain("order-organizer-assistant-windows.exe");
+    expect(readme).not.toContain("r004-order-extraction-tool");
   });
 });
