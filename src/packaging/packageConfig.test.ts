@@ -12,20 +12,31 @@ describe("Electron packaging configuration", () => {
       devDependencies: Record<string, string>;
       build?: unknown;
     };
+    const tsconfigBuild = JSON.parse(
+      await readFile(path.join(root, "tsconfig.build.json"), "utf8"),
+    ) as {
+      extends?: string;
+      include?: string[];
+      exclude?: string[];
+    };
 
     expect(packageJson.author).toBe("AUSMET");
     expect(packageJson.devDependencies).toHaveProperty("electron-builder");
+    expect(packageJson.scripts["clean:dist"]).toContain("rmSync('dist'");
+    expect(packageJson.scripts.build).toBe("npm run clean:dist && npm run build:main && npm run build:renderer");
+    expect(packageJson.scripts["build:main"]).toBe("tsc -p tsconfig.build.json");
     expect(packageJson.scripts.dist).toBe("npm run dist:win");
     expect(packageJson.scripts["dist:win"]).toBe("npm run build && electron-builder --win portable");
     expect(packageJson.scripts["dist:win:ci"]).toBe(
       "npm run build && electron-builder --win portable --publish never",
     );
+    expect(packageJson.scripts["pack:win"]).toBe("electron-builder --win portable --publish never");
     expect(packageJson.scripts).not.toHaveProperty("dist:mac");
     expect(packageJson.build).toMatchObject({
       appId: "com.ausmet.order-organizer-assistant",
       productName: "订单整理助手",
       directories: { output: "release" },
-      files: ["dist/**/*", "package.json"],
+      files: ["dist/**/*", "!dist/**/*.test.js", "package.json"],
       extraResources: [
         { from: "python-helper", to: "python-helper" },
         { from: "python_extraction_bridge.py", to: "python/python_extraction_bridge.py" },
@@ -37,9 +48,14 @@ describe("Electron packaging configuration", () => {
       target: ["portable"],
       icon: "assets/app_icon.ico",
     },
-    portable: {
-      artifactName: "order-organizer-assistant-windows.${ext}",
-    },
+      portable: {
+        artifactName: "order-organizer-assistant-windows.${ext}",
+      },
+    });
+    expect(tsconfigBuild).toMatchObject({
+      extends: "./tsconfig.json",
+      include: ["src/core/**/*.ts", "src/main/**/*.ts", "src/preload/**/*.cts", "src/shared/**/*.ts"],
+      exclude: ["src/**/*.test.ts", "src/**/*.test.tsx"],
     });
   });
 

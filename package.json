@@ -6,13 +6,15 @@
   "main": "dist/main/main.js",
   "type": "module",
   "scripts": {
-    "build": "npm run build:main && npm run build:renderer",
-    "build:main": "tsc -p tsconfig.json",
+    "build": "npm run clean:dist && npm run build:main && npm run build:renderer",
+    "clean:dist": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build:main": "tsc -p tsconfig.build.json",
     "build:renderer": "vite build",
     "dev": "npm run build:main && vite --host 127.0.0.1",
     "dist": "npm run dist:win",
     "dist:win": "npm run build && electron-builder --win portable",
     "dist:win:ci": "npm run build && electron-builder --win portable --publish never",
+    "pack:win": "electron-builder --win portable --publish never",
     "start": "npm run build && electron .",
     "test": "vitest run --config vitest.config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
@@ -45,6 +47,7 @@
     },
     "files": [
       "dist/**/*",
+      "!dist/**/*.test.js",
       "package.json"
     ],
     "extraResources": [
