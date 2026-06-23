@@ -1110,6 +1110,7 @@ function sourceGoodsOverride(
     if (upper.includes("CAPPING")) {
       return tableHasFlatSheet ? null : "DS";
     }
+    return "DS";
   }
   if (upper.includes("CONCEALED FRAME")) {
     return "CONCEALED";
@@ -1794,6 +1795,8 @@ function writeManualTotals(
   }
   if (totals.v) {
     values[21] = excelDisplayInt(totals.v);
+  } else if (values[11] === "DS") {
+    values[21] = 0;
   }
   if (totals.w) {
     values[22] = excelDisplayInt(totals.w);

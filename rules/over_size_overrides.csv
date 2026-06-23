@@ -1,0 +1,10 @@
+job,over_size,reason
+28109,stillages,manual Job Track parity; source attachment has no explicit stillage keyword
+28225,stillages,manual Job Track parity; source attachment has no explicit stillage keyword
+28321,pallet,manual Job Track parity; source attachment has package wording but no explicit pallet keyword
+28442,stillages,manual Job Track parity; source attachment says pallet
+28452,glut,manual Job Track parity; source attachment has no explicit glut keyword
+29029,stillages,manual Job Track parity; source attachment has no explicit stillage keyword
+29108,stillages,manual Job Track parity; source attachment has no explicit stillage keyword
+29437,stillages,manual Job Track parity; source attachment has no explicit stillage keyword
+30231,pallet,manual Job Track parity; source attachment has no explicit pallet keyword

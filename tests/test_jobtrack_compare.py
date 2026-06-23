@@ -44,6 +44,15 @@ def test_address_normalized_ignores_loop_abbreviation_and_customer_prefix() -> N
     )
 
 
+def test_source_url_is_relative_to_html_file() -> None:
+    source_dir = ROOT / "data/email_pull/session"
+    html_path = source_dir / "整理结果/jobtrack_compare.html"
+
+    url = compare.source_url(source_dir, "INBOX-1-Test File.xlsx", html_path)
+
+    assert url == "../INBOX-1-Test%20File.xlsx"
+
+
 def test_explained_category_marks_blank_po_as_job_track_missing() -> None:
     category = compare.explained_category_for(
         {"col": "2", "track": "", "generated": "PO-123", "track_norm": "", "generated_norm": "PO-123"},
@@ -70,3 +79,18 @@ def test_explained_category_marks_kd_old_bucket_style() -> None:
     )
 
     assert category == "KD旧填法：第24列混在第22列"
+
+
+def test_explained_category_marks_goods_pair_order_only_difference() -> None:
+    track_values = [None] * 24
+    generated_values = [None] * 24
+    track_values[10:14] = [1, "MODERN", 2, "CS"]
+    generated_values[10:14] = [2, "CS", 1, "MODERN"]
+
+    category = compare.explained_category_for(
+        {"col": "11", "track": "1", "generated": "2", "track_norm": "1", "generated_norm": "2"},
+        track_values,
+        generated_values,
+    )
+
+    assert category == "Goods1/Goods2顺序差"

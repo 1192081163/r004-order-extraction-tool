@@ -4,6 +4,7 @@ import argparse
 import csv
 import html
 import json
+import os
 import re
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
@@ -153,6 +154,14 @@ def is_kd_old_bucket_style(track_values: list[object], generated_values: list[ob
     return abs(numeric_value(track_values[21]) - expected_old_v) < 0.01
 
 
+def is_goods_pair_order_only_difference(track_values: list[object], generated_values: list[object]) -> bool:
+    track_pair = [normalized(track_values[index], index + 1) for index in range(10, 14)]
+    generated_pair = [normalized(generated_values[index], index + 1) for index in range(10, 14)]
+    if not all(track_pair) or not all(generated_pair):
+        return False
+    return track_pair == [generated_pair[2], generated_pair[3], generated_pair[0], generated_pair[1]]
+
+
 def explained_category_for(row: dict[str, str], track_values: list[object], generated_values: list[object]) -> str:
     col = row["col"]
     track = row["track"]
@@ -160,6 +169,8 @@ def explained_category_for(row: dict[str, str], track_values: list[object], gene
     track_norm = row["track_norm"]
     generated_norm = row["generated_norm"]
 
+    if col in {"11", "12", "13", "14"} and is_goods_pair_order_only_difference(track_values, generated_values):
+        return "Goods1/Goods2顺序差"
     if col in {"18", "19"} and track_norm and not generated_norm:
         return "手填汇总列：源订单无直接字段"
     if col == "2" and not track_norm and generated_norm:
@@ -236,11 +247,14 @@ def reason_for(row: dict[str, str], oversize_reasons: dict[str, str]) -> str:
     return f"{base}；{detail}" if detail else base
 
 
-def source_url(source_dir: Path, source_file: str) -> str:
+def source_url(source_dir: Path, source_file: str, html_path: Path | None = None) -> str:
     if not source_file:
         return ""
-    path = source_dir / source_file
-    return "file://" + quote(str(path))
+    path = (source_dir / source_file).resolve()
+    if html_path is None:
+        return path.as_uri()
+    relative = os.path.relpath(path, html_path.parent.resolve())
+    return quote(Path(relative).as_posix(), safe="/")
 
 
 def build_diffs(
@@ -249,6 +263,7 @@ def build_diffs(
     audit_path: Path,
     oversize_path: Path,
     source_dir: Path,
+    html_path: Path | None = None,
 ) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
     headers, generated_rows = load_rows(generated_path)
     _, reference_rows = load_rows(reference_path)
@@ -288,12 +303,12 @@ def build_diffs(
             source_file = source_files.get(job, "")
             page_row = dict(diff)
             page_row.update(
-                {
-                    "sourceFile": source_file,
-                    "sourceUrl": source_url(source_dir, source_file),
-                    "colKey": f"{col}|{header}",
-                    "colLabel": f"{col} - {header}" if header else str(col),
-                }
+                    {
+                        "sourceFile": source_file,
+                        "sourceUrl": source_url(source_dir, source_file, html_path),
+                        "colKey": f"{col}|{header}",
+                        "colLabel": f"{col} - {header}" if header else str(col),
+                    }
             )
             category = explained_category_for(diff, track_values, generated_values)
             reason = reason_for(diff, oversize_reasons)
@@ -447,7 +462,7 @@ def main() -> int:
     parser.add_argument("--source-dir", type=Path, default=DEFAULT_SOURCE_DIR)
     args = parser.parse_args()
 
-    diffs, page_rows = build_diffs(args.generated, args.reference, args.audit, args.oversize, args.source_dir)
+    diffs, page_rows = build_diffs(args.generated, args.reference, args.audit, args.oversize, args.source_dir, args.html)
     write_diffs(args.diffs, diffs)
     write_html(args.html, page_rows)
     write_html(args.report_html, page_rows)

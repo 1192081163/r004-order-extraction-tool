@@ -584,6 +584,27 @@ async function makeDanzeDoorSkinPoOrder(filePath: string): Promise<void> {
   await wb.xlsx.writeFile(filePath);
 }
 
+async function makeDanzeDoorSkinProfileCodeOrder(filePath: string): Promise<void> {
+  const wb = new ExcelJS.Workbook();
+  const ws = wb.addWorksheet("Main Sheet");
+  ws.getCell("A1").value = "AUMSET JOB # 30471 REV00";
+  ws.getCell("B2").value = "Danze Mining";
+  ws.getCell("B4").value = "2 Volcanic Lp, Wangara";
+  ws.getCell("B5").value = "2026-06-24";
+  ws.getCell("B6").value = "02-6365-03";
+  ws.getCell("B7").value = "57d";
+  ws.getCell("B10").value = "1.2mm";
+  ws.getCell("C10").value = "Zinc";
+  const headers = ["Quantity", "PROFILE", "HEIGHT", "WIDTH", "FOUR SIDED"];
+  headers.forEach((value, index) => {
+    ws.getCell(13, index + 1).value = value;
+  });
+  [4, "A", 368, 268, "YES"].forEach((value, index) => {
+    ws.getCell(14, index + 1).value = value;
+  });
+  await wb.xlsx.writeFile(filePath);
+}
+
 async function makeDoorStopBuildUpOrder(filePath: string): Promise<void> {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("Main Sheet");
@@ -1676,6 +1697,18 @@ describe("extractWorkbook", () => {
 
     expect(typescript.values[1]).toEqual(python.values[1]);
     expect(typescript.values[2]).toEqual(python.values[2]);
+    expect(typescript.manualCheck).toEqual(python.manualCheck);
+  });
+
+  test("matches Python reference for Danze Door Skin profile-code source files", async () => {
+    const filePath = path.join(tempRoot, "Danze Mining 30471 Door Skins 2mm and 1.05 + Window Handle Blank.xlsx");
+    await makeDanzeDoorSkinProfileCodeOrder(filePath);
+
+    const python = await pythonReference(filePath);
+    const typescript = await extractWorkbook(filePath, { inferManual: true });
+
+    expect(typescript.values.slice(10, 12)).toEqual(python.values.slice(10, 12));
+    expect(typescript.values.slice(19, 24)).toEqual(python.values.slice(19, 24));
     expect(typescript.manualCheck).toEqual(python.manualCheck);
   });
 
