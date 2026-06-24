@@ -11,6 +11,7 @@ describe("email API config", () => {
         EMAIL_AUTH_CODE: " secret ",
         EMAIL_IMAP_SERVER: " imap.example.com ",
         EMAIL_IMAP_PORT: "1993",
+        EMAIL_IMAP_PROXY: " socks5://127.0.0.1:7891 ",
         EMAIL_API_HOST: "0.0.0.0",
         EMAIL_API_PORT: "9090",
       }),
@@ -19,10 +20,11 @@ describe("email API config", () => {
       host: "0.0.0.0",
       port: 9090,
       email: "orders@example.com",
-      authCode: "secret",
-      server: "imap.example.com",
-      imapPort: 1993,
-    });
+        authCode: "secret",
+        server: "imap.example.com",
+        imapPort: 1993,
+        imapProxy: "socks5://127.0.0.1:7891",
+      });
   });
 
   test("uses safe local defaults for host, HTTP port, and IMAP settings", () => {

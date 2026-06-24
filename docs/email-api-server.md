@@ -19,9 +19,12 @@ export EMAIL_API_HOST="127.0.0.1"
 export EMAIL_API_PORT="8787"
 export EMAIL_IMAP_SERVER="imap.exmail.qq.com"
 export EMAIL_IMAP_PORT="993"
+export EMAIL_IMAP_PROXY=""
 ```
 
 建议线上部署时把 `EMAIL_API_HOST` 设为 `127.0.0.1`，再由 Nginx、内网网关或 VPN 暴露给可信软件使用。不要把 `EMAIL_AUTH_CODE` 放进请求体或前端代码。
+
+`EMAIL_IMAP_PROXY` 可选，服务器直连 IMAP 端口受限时填写代理地址，例如 `socks5://127.0.0.1:7891`。
 
 ## 启动
 

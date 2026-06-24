@@ -8,6 +8,7 @@ export interface EmailApiConfig {
   authCode: string;
   server: string;
   imapPort: number;
+  imapProxy?: string;
 }
 
 type EnvLike = Record<string, string | undefined>;
@@ -24,6 +25,7 @@ export function loadEmailApiConfig(env: EnvLike = process.env): EmailApiConfig {
     authCode: requiredEnv(env, "EMAIL_AUTH_CODE"),
     server: optionalEnv(env, "EMAIL_IMAP_SERVER", DEFAULT_IMAP_SERVER),
     imapPort: portEnv(env, "EMAIL_IMAP_PORT", DEFAULT_IMAP_PORT),
+    imapProxy: env.EMAIL_IMAP_PROXY?.trim() || undefined,
   };
 }
 

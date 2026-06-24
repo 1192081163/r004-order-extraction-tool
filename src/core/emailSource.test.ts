@@ -26,6 +26,7 @@ const imapMock = vi.hoisted(() => ({
   downloads: {} as Record<string, Record<string, { content: Buffer | null; meta?: { filename?: string } }>>,
   downloadManyWhileFetching: false,
   instances: [] as Array<{
+    options?: unknown;
     fetchCalls: Array<{ range: unknown; query: unknown; options: unknown }>;
     downloadManyCalls: Array<{ range: string; parts: string[]; options: unknown }>;
     lockedMailbox?: string;
@@ -43,8 +44,10 @@ vi.mock("imapflow", () => {
     releasedLocks = 0;
     logoutCalls = 0;
     activeFetches = 0;
+    options?: unknown;
 
-    constructor() {
+    constructor(options?: unknown) {
+      this.options = options;
       imapMock.instances.push(this);
     }
 
@@ -261,6 +264,25 @@ describe("email fetch windows", () => {
 });
 
 describe("email IMAP scanning", () => {
+  test("passes configured proxy to the IMAP client", async () => {
+    await listRecentEmailMessages(
+      {
+        ...testImapConfig(),
+        proxy: "socks5://127.0.0.1:7891",
+      },
+      {
+        days: 1,
+        now: new Date("2026-06-18T00:00:00.000Z"),
+      },
+    );
+
+    expect(imapMock.instances[0]?.options).toMatchObject({
+      host: "imap.example.com",
+      port: 993,
+      proxy: "socks5://127.0.0.1:7891",
+    });
+  });
+
   test("lists candidate order emails from metadata without fetching full message source", async () => {
     imapMock.messages = [
       makeMetadataMessage({

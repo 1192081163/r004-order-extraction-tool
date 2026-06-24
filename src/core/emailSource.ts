@@ -407,6 +407,7 @@ function createClient(config: ImapConfig): ImapFlow {
       user: config.email,
       pass: config.authCode,
     },
+    ...(config.proxy ? { proxy: config.proxy } : {}),
     logger: false,
   });
 }

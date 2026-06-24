@@ -74,6 +74,7 @@ describe("email API server", () => {
         authCode: "secret",
         server: "imap.example.com",
         port: 1993,
+        proxy: "socks5://127.0.0.1:7891",
         days: 3,
       },
     ]);
@@ -129,6 +130,7 @@ describe("email API server", () => {
         authCode: "secret",
         server: "imap.example.com",
         port: 1993,
+        proxy: "socks5://127.0.0.1:7891",
         messageUids: ["101", "102"],
         hours: 168,
         inferManual: false,
@@ -301,6 +303,7 @@ function testConfig(): EmailApiConfig {
     authCode: "secret",
     server: "imap.example.com",
     imapPort: 1993,
+    imapProxy: "socks5://127.0.0.1:7891",
   };
 }
 

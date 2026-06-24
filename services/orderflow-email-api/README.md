@@ -21,9 +21,12 @@ EMAIL_API_HOST=0.0.0.0
 EMAIL_API_PORT=8787
 EMAIL_IMAP_SERVER=imap.exmail.qq.com
 EMAIL_IMAP_PORT=993
+EMAIL_IMAP_PROXY=
 ```
 
 `EMAIL_AUTH_CODE` 不要写进客户端代码，客户端只需要 `EMAIL_API_TOKEN`。
+
+`EMAIL_IMAP_PROXY` 可选，服务器直连 IMAP 端口受限时使用，例如 `socks5://127.0.0.1:7891` 或 `http://127.0.0.1:7890`。
 
 ## 本地运行
 
@@ -56,6 +59,7 @@ docker run --rm -p 8787:8787 \
   -e EMAIL_API_TOKEN="$EMAIL_API_TOKEN" \
   -e EMAIL_ACCOUNT="$EMAIL_ACCOUNT" \
   -e EMAIL_AUTH_CODE="$EMAIL_AUTH_CODE" \
+  -e EMAIL_IMAP_PROXY="$EMAIL_IMAP_PROXY" \
   orderflow-email-api
 ```
 

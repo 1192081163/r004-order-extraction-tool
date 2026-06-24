@@ -101,12 +101,15 @@ async function handleRequest(
   }
 }
 
-function emailConnectionFromConfig(config: EmailApiConfig): Pick<EmailListRequest, "email" | "authCode" | "server" | "port"> {
+function emailConnectionFromConfig(
+  config: EmailApiConfig,
+): Pick<EmailListRequest, "email" | "authCode" | "server" | "port" | "proxy"> {
   return {
     email: config.email,
     authCode: config.authCode,
     server: config.server,
     port: config.imapPort,
+    proxy: config.imapProxy,
   };
 }
 

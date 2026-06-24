@@ -69,6 +69,7 @@ export interface EmailSettings {
 export interface ImapConfig extends EmailSettings {
   server: string;
   port: number;
+  proxy?: string;
 }
 
 export interface EmailMessageSummary {
