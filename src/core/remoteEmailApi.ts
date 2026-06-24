@@ -13,6 +13,7 @@ export interface RemoteEmailApiConfig {
 type EnvLike = Record<string, string | undefined>;
 
 const REMOTE_API_SETTINGS_FILE = "email_api_client.json";
+const PACKAGED_REMOTE_API_SETTINGS_FILE = path.join("config", "remote-email-api.json");
 const EMPTY_OUTPUTS: OutputPaths = {
   outputDir: "",
   csvOutput: "",
@@ -24,9 +25,19 @@ export function defaultRemoteEmailApiSettingsPath(): string {
   return path.join(appConfigDir(), REMOTE_API_SETTINGS_FILE);
 }
 
+export function defaultPackagedRemoteEmailApiSettingsPath(): string | undefined {
+  const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+  if (resourcesPath) {
+    return path.join(resourcesPath, PACKAGED_REMOTE_API_SETTINGS_FILE);
+  }
+
+  return path.join(process.cwd(), "resources", "remote-email-api.json");
+}
+
 export async function loadRemoteEmailApiConfig(
   env: EnvLike = process.env,
   settingsPath = defaultRemoteEmailApiSettingsPath(),
+  packagedSettingsPath = defaultPackagedRemoteEmailApiSettingsPath(),
 ): Promise<RemoteEmailApiConfig | undefined> {
   const envBaseUrl = env.ORDERFLOW_EMAIL_API_URL?.trim();
   if (envBaseUrl) {
@@ -36,19 +47,12 @@ export async function loadRemoteEmailApiConfig(
     };
   }
 
-  try {
-    const raw = JSON.parse(await readFile(settingsPath, "utf8")) as Partial<Record<keyof RemoteEmailApiConfig, unknown>>;
-    const baseUrl = typeof raw.baseUrl === "string" ? raw.baseUrl.trim() : "";
-    if (!baseUrl) {
-      return undefined;
-    }
-    return {
-      baseUrl,
-      token: typeof raw.token === "string" ? optionalTrimmed(raw.token) : undefined,
-    };
-  } catch {
-    return undefined;
+  const userConfig = await readRemoteEmailApiConfig(settingsPath);
+  if (userConfig) {
+    return userConfig;
   }
+
+  return packagedSettingsPath ? readRemoteEmailApiConfig(packagedSettingsPath) : undefined;
 }
 
 export class RemoteEmailApiClient {
@@ -104,4 +108,20 @@ export class RemoteEmailApiClient {
 function optionalTrimmed(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed || undefined;
+}
+
+async function readRemoteEmailApiConfig(settingsPath: string): Promise<RemoteEmailApiConfig | undefined> {
+  try {
+    const raw = JSON.parse(await readFile(settingsPath, "utf8")) as Partial<Record<keyof RemoteEmailApiConfig, unknown>>;
+    const baseUrl = typeof raw.baseUrl === "string" ? raw.baseUrl.trim() : "";
+    if (!baseUrl) {
+      return undefined;
+    }
+    return {
+      baseUrl,
+      token: typeof raw.token === "string" ? optionalTrimmed(raw.token) : undefined,
+    };
+  } catch {
+    return undefined;
+  }
 }

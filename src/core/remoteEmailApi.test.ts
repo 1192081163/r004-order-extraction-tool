@@ -1,4 +1,5 @@
 import { createServer, type Server } from "node:http";
+import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -109,6 +110,39 @@ describe("remote email API client", () => {
         settingsPath,
       ),
     ).toEqual({ baseUrl: "http://127.0.0.1:8091", token: "token" });
+  });
+
+  test("loads packaged remote API settings when local config file is missing", async () => {
+    const tempDir = await mkdtemp(path.join(tmpdir(), "remote-email-api-"));
+    const missingSettingsPath = path.join(tempDir, "missing.json");
+    const packagedSettingsPath = path.join(tempDir, "packaged.json");
+    await writeFile(
+      packagedSettingsPath,
+      JSON.stringify({ baseUrl: " http://127.0.0.1:8091 ", token: " packaged-token " }),
+      "utf8",
+    );
+
+    await expect(loadRemoteEmailApiConfig({}, missingSettingsPath, packagedSettingsPath)).resolves.toEqual({
+      baseUrl: "http://127.0.0.1:8091",
+      token: "packaged-token",
+    });
+  });
+
+  test("prefers local remote API settings over packaged defaults", async () => {
+    const tempDir = await mkdtemp(path.join(tmpdir(), "remote-email-api-"));
+    const settingsPath = path.join(tempDir, "local.json");
+    const packagedSettingsPath = path.join(tempDir, "packaged.json");
+    await writeFile(settingsPath, JSON.stringify({ baseUrl: "http://local.test", token: "local-token" }), "utf8");
+    await writeFile(
+      packagedSettingsPath,
+      JSON.stringify({ baseUrl: "http://packaged.test", token: "packaged-token" }),
+      "utf8",
+    );
+
+    await expect(loadRemoteEmailApiConfig({}, settingsPath, packagedSettingsPath)).resolves.toEqual({
+      baseUrl: "http://local.test",
+      token: "local-token",
+    });
   });
 });
 

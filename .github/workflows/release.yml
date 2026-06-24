@@ -111,6 +111,13 @@ jobs:
         run: |
           Set-Content -Path src/core/buildInfo.ts -Value 'export const CURRENT_RELEASE_TAG = "build-${{ github.run_number }}";'
 
+      - name: Write packaged remote email API config
+        shell: bash
+        env:
+          ORDERFLOW_EMAIL_API_URL: ${{ vars.ORDERFLOW_EMAIL_API_URL }}
+          ORDERFLOW_EMAIL_API_TOKEN: ${{ secrets.ORDERFLOW_EMAIL_API_TOKEN }}
+        run: node scripts/write-remote-email-api-config.mjs
+
       - name: Build Windows portable exe
         run: npm run dist:win:ci
 

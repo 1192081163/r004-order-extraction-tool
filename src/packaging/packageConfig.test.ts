@@ -66,6 +66,7 @@ describe("Electron packaging configuration", () => {
         { from: "desktop_runner.py", to: "python/desktop_runner.py" },
         { from: "extract.py", to: "python/extract.py" },
         { from: "rules", to: "python/rules" },
+        { from: "resources/remote-email-api.json", to: "config/remote-email-api.json" },
       ],
     win: {
       target: ["portable"],
@@ -102,7 +103,14 @@ describe("Electron packaging configuration", () => {
     expect(workflow).toContain("requirements-python-runner.txt");
     expect(workflow).toContain("Write release build info");
     expect(workflow).toContain('export const CURRENT_RELEASE_TAG = "build-${{ github.run_number }}"');
+    expect(workflow).toContain("Write packaged remote email API config");
+    expect(workflow).toContain("ORDERFLOW_EMAIL_API_URL: ${{ vars.ORDERFLOW_EMAIL_API_URL }}");
+    expect(workflow).toContain("ORDERFLOW_EMAIL_API_TOKEN: ${{ secrets.ORDERFLOW_EMAIL_API_TOKEN }}");
+    expect(workflow).toContain("node scripts/write-remote-email-api-config.mjs");
     expect(workflow.indexOf("Write release build info")).toBeLessThan(workflow.indexOf("npm run dist:win:ci"));
+    expect(workflow.indexOf("Write packaged remote email API config")).toBeLessThan(
+      workflow.indexOf("npm run dist:win:ci"),
+    );
     expect(workflow).toContain("Cache Electron downloads");
     expect(workflow).toContain("~\\AppData\\Local\\electron\\Cache");
     expect(workflow).toContain("~\\AppData\\Local\\electron-builder\\Cache");

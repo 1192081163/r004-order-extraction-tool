@@ -88,6 +88,10 @@
       {
         "from": "rules",
         "to": "python/rules"
+      },
+      {
+        "from": "resources/remote-email-api.json",
+        "to": "config/remote-email-api.json"
       }
     ],
     "win": {
