@@ -30,6 +30,7 @@
     "dist:win": "npm run build && electron-builder --win portable",
     "dist:win:ci": "npm run build && electron-builder --win portable --publish never",
     "pack:win": "electron-builder --win portable --publish never",
+    "serve:email-api": "npm run build:main && node dist/server/main.js",
     "start": "npm run build && electron .",
     "test": "vitest run --config vitest.config.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"

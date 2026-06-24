@@ -77,7 +77,7 @@ describe("Electron packaging configuration", () => {
     });
     expect(tsconfigBuild).toMatchObject({
       extends: "./tsconfig.json",
-      include: ["src/core/**/*.ts", "src/main/**/*.ts", "src/preload/**/*.cts", "src/shared/**/*.ts"],
+    include: ["src/core/**/*.ts", "src/main/**/*.ts", "src/preload/**/*.cts", "src/server/**/*.ts", "src/shared/**/*.ts"],
       exclude: ["src/**/*.test.ts", "src/**/*.test.tsx"],
     });
   });

@@ -40,7 +40,7 @@ describe("mail notification helpers", () => {
     ]);
 
     expect(notification).toEqual({
-      title: "发现 2 封新订单邮件",
+      title: "发现 2 封新候选邮件",
       body: "最新：PO 1001；还有 1 封待提取",
     });
   });
