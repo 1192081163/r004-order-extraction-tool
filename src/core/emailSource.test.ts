@@ -2,13 +2,15 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import ExcelJS from "exceljs";
-import { afterEach, beforeEach, describe, expect, test } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 
 import { loadEmailSettings, saveEmailSettings } from "./settings.js";
 import {
   collectOrderEmailAttachments,
+  fetchEmailOrderFiles,
   isExcelAttachmentName,
   isMessageWithinFetchWindow,
+  listRecentEmailMessages,
   saveEmailAttachments,
   sanitizeAttachmentName,
   shouldIncludeMessageUid,
@@ -17,11 +19,89 @@ import {
   summarizeParsedOrderEmail,
   type EmailAttachment,
 } from "./emailSource.js";
+import type { ImapConfig } from "../shared/types.js";
+
+const imapMock = vi.hoisted(() => ({
+  messages: [] as unknown[],
+  downloads: {} as Record<string, Record<string, { content: Buffer | null; meta?: { filename?: string } }>>,
+  downloadManyWhileFetching: false,
+  instances: [] as Array<{
+    options?: unknown;
+    fetchCalls: Array<{ range: unknown; query: unknown; options: unknown }>;
+    downloadManyCalls: Array<{ range: string; parts: string[]; options: unknown }>;
+    lockedMailbox?: string;
+    releasedLocks: number;
+    logoutCalls: number;
+    activeFetches: number;
+  }>,
+}));
+
+vi.mock("imapflow", () => {
+  class ImapFlow {
+    fetchCalls: Array<{ range: unknown; query: unknown; options: unknown }> = [];
+    downloadManyCalls: Array<{ range: string; parts: string[]; options: unknown }> = [];
+    lockedMailbox?: string;
+    releasedLocks = 0;
+    logoutCalls = 0;
+    activeFetches = 0;
+    options?: unknown;
+
+    constructor(options?: unknown) {
+      this.options = options;
+      imapMock.instances.push(this);
+    }
+
+    async connect(): Promise<void> {}
+
+    async getMailboxLock(mailbox: string): Promise<{ release: () => void }> {
+      this.lockedMailbox = mailbox;
+      return {
+        release: () => {
+          this.releasedLocks += 1;
+        },
+      };
+    }
+
+    async *fetch(range: unknown, query: unknown, options?: unknown): AsyncGenerator<unknown> {
+      this.fetchCalls.push({ range, query, options });
+      this.activeFetches += 1;
+      try {
+        for (const message of imapMock.messages) {
+          yield message;
+        }
+      } finally {
+        this.activeFetches -= 1;
+      }
+    }
+
+    async downloadMany(
+      range: string,
+      parts: string[],
+      options?: unknown,
+    ): Promise<Record<string, { content: Buffer | null; meta?: { filename?: string } }>> {
+      if (imapMock.downloadManyWhileFetching && this.activeFetches > 0) {
+        throw new Error("downloadMany must run after fetch iteration completes");
+      }
+      this.downloadManyCalls.push({ range, parts, options });
+      return imapMock.downloads[range] ?? {};
+    }
+
+    async logout(): Promise<void> {
+      this.logoutCalls += 1;
+    }
+  }
+
+  return { ImapFlow };
+});
 
 let tempRoot = "";
 
 beforeEach(async () => {
   tempRoot = await mkdtemp(path.join(os.tmpdir(), "email-source-"));
+  imapMock.messages = [];
+  imapMock.downloads = {};
+  imapMock.downloadManyWhileFetching = false;
+  imapMock.instances.length = 0;
 });
 
 afterEach(async () => {
@@ -183,6 +263,107 @@ describe("email fetch windows", () => {
   });
 });
 
+describe("email IMAP scanning", () => {
+  test("passes configured proxy to the IMAP client", async () => {
+    await listRecentEmailMessages(
+      {
+        ...testImapConfig(),
+        proxy: "socks5://127.0.0.1:7891",
+      },
+      {
+        days: 1,
+        now: new Date("2026-06-18T00:00:00.000Z"),
+      },
+    );
+
+    expect(imapMock.instances[0]?.options).toMatchObject({
+      host: "imap.example.com",
+      port: 993,
+      proxy: "socks5://127.0.0.1:7891",
+    });
+  });
+
+  test("lists candidate order emails from metadata without fetching full message source", async () => {
+    imapMock.messages = [
+      makeMetadataMessage({
+        uid: 501,
+        subject: "PO 501",
+        date: new Date("2026-06-17T03:30:00.000Z"),
+        attachments: ["order.xlsx", "notes.txt"],
+      }),
+      makeMetadataMessage({
+        uid: 502,
+        subject: "No Excel",
+        date: new Date("2026-06-17T04:00:00.000Z"),
+        attachments: ["photo.png"],
+      }),
+    ];
+
+    const result = await listRecentEmailMessages(testImapConfig(), {
+      days: 7,
+      now: new Date("2026-06-18T00:00:00.000Z"),
+    });
+
+    expect(result.messages).toEqual([
+      {
+        uid: "501",
+        subject: "PO 501",
+        from: "Orders <orders@example.com>",
+        date: "2026-06-17T03:30:00.000Z",
+        attachmentCount: 1,
+        excelAttachmentNames: ["order.xlsx"],
+        hasExcelAttachments: true,
+      },
+    ]);
+    expect(result.scannedMessages).toBe(2);
+    expect(result.orderAttachmentCount).toBe(1);
+    expect(result.nonOrderExcelAttachmentCount).toBe(0);
+    expect(imapMock.instances[0]?.fetchCalls).toEqual([
+      {
+        range: { since: new Date("2026-06-11T00:00:00.000Z") },
+        query: { envelope: true, bodyStructure: true, uid: true },
+        options: undefined,
+      },
+    ]);
+    expect(imapMock.instances[0]?.downloadManyCalls).toEqual([]);
+  });
+
+  test("downloads selected Excel attachment parts before filtering order workbooks", async () => {
+    imapMock.downloadManyWhileFetching = true;
+    imapMock.messages = [
+      makeMetadataMessage({
+        uid: 601,
+        subject: "PO 601",
+        date: new Date("2026-06-17T03:30:00.000Z"),
+        attachments: ["order.xlsx", "weekly-report.xlsx", "notes.txt"],
+      }),
+    ];
+    imapMock.downloads = {
+      "601": {
+        "1": { content: await makeOrderWorkbookBuffer(), meta: { filename: "order.xlsx" } },
+        "2": { content: await makeReportWorkbookBuffer(), meta: { filename: "weekly-report.xlsx" } },
+      },
+    };
+
+    const result = await fetchEmailOrderFiles(testImapConfig(), tempRoot, { messageUids: ["601"] });
+
+    expect(result.scannedMessages).toBe(1);
+    expect(result.attachmentCount).toBe(1);
+    expect(result.files).toHaveLength(1);
+    expect(path.basename(result.files[0] ?? "")).toBe("order.xlsx");
+    expect(imapMock.instances[0]?.fetchCalls).toEqual([
+      {
+        range: "601",
+        query: { uid: true, bodyStructure: true, envelope: true },
+        options: { uid: true },
+      },
+    ]);
+    expect(imapMock.instances[0]?.downloadManyCalls).toEqual([
+      { range: "601", parts: ["1", "2"], options: { uid: true } },
+    ]);
+  });
+});
+
 async function makeOrderWorkbookBuffer(): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet("Worksheet");
@@ -206,4 +387,50 @@ async function makeReportWorkbookBuffer(): Promise<Buffer> {
   worksheet.getCell("A2").value = "不是订单";
   worksheet.getCell("B2").value = "2026-06-15";
   return Buffer.from(await workbook.xlsx.writeBuffer());
+}
+
+function testImapConfig(): ImapConfig {
+  return {
+    email: "orders@example.com",
+    authCode: "secret",
+    server: "imap.example.com",
+    port: 993,
+  };
+}
+
+function makeMetadataMessage({
+  uid,
+  subject,
+  date,
+  attachments,
+}: {
+  uid: number;
+  subject: string;
+  date: Date;
+  attachments: string[];
+}): unknown {
+  const message = {
+    uid,
+    envelope: {
+      subject,
+      date,
+      from: [{ name: "Orders", address: "orders@example.com" }],
+    },
+    bodyStructure: {
+      type: "multipart/mixed",
+      childNodes: attachments.map((filename, index) => ({
+        part: String(index + 1),
+        type: "application/octet-stream",
+        dispositionParameters: { filename },
+      })),
+    },
+  };
+
+  Object.defineProperty(message, "source", {
+    get() {
+      throw new Error("list and attachment-part fetch should not read full message source");
+    },
+  });
+
+  return message;
 }

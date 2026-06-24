@@ -20,7 +20,7 @@ export function buildNewOrderEmailNotification(messages: EmailMessageSummary[]):
   const count = messages.length;
   const latestSubject = truncateNotificationText(messages[0]?.subject?.trim() || "(无主题)", 64);
   return {
-    title: `发现 ${count} 封新订单邮件`,
+    title: `发现 ${count} 封新候选邮件`,
     body: count > 1 ? `最新：${latestSubject}；还有 ${count - 1} 封待提取` : `最新：${latestSubject}`,
   };
 }

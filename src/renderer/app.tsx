@@ -40,7 +40,6 @@ const BRIDGE_MISSING_MESSAGE = "桌面接口加载失败，请重启应用。";
 
 interface MailListStats {
   scannedMessages: number;
-  nonOrderExcelAttachmentCount?: number;
 }
 
 function App() {
@@ -91,7 +90,7 @@ function App() {
     [visibleEmailMessages],
   );
   const visibleMailStatus = mailListStats
-    ? `${mailDayTitle}：订单邮件 ${visibleEmailMessages.length} 封，待提取 ${pendingCount} 封，订单附件 ${visibleAttachmentCount} 个；近一周扫描 ${mailListStats.scannedMessages} 封，非订单附件 ${mailListStats.nonOrderExcelAttachmentCount ?? 0} 个`
+    ? `${mailDayTitle}：候选邮件 ${visibleEmailMessages.length} 封，待提取 ${pendingCount} 封，Excel 候选附件 ${visibleAttachmentCount} 个；近一周扫描 ${mailListStats.scannedMessages} 封`
     : mailStatus;
 
   const appendLog = useCallback((line: string) => {
@@ -142,12 +141,12 @@ function App() {
         });
         const sortedMessages = sortMessages(result.messages);
         const validUids = new Set(sortedMessages.filter((message) => message.hasExcelAttachments).map((message) => message.uid));
-        const orderAttachmentCount = result.orderAttachmentCount ?? sortedMessages.reduce((sum, message) => sum + message.attachmentCount, 0);
-        const nonOrderExcelAttachmentCount = result.nonOrderExcelAttachmentCount ?? 0;
+        const candidateAttachmentCount =
+          result.orderAttachmentCount ?? sortedMessages.reduce((sum, message) => sum + message.attachmentCount, 0);
         const mailboxWasLoaded = hasLoadedMailbox.current;
         const newPendingMessages = findNewPendingOrderMessages(sortedMessages, seenMessageUids.current, activeExtractedMessageUids);
         const shouldAlertNewMessages = mailboxWasLoaded && newPendingMessages.length > 0;
-        const baseMailStatus = `近一周扫描 ${result.scannedMessages} 封，订单邮件 ${sortedMessages.length} 封，订单附件 ${orderAttachmentCount} 个，非订单附件 ${nonOrderExcelAttachmentCount} 个`;
+        const baseMailStatus = `近一周扫描 ${result.scannedMessages} 封，候选邮件 ${sortedMessages.length} 封，Excel 候选附件 ${candidateAttachmentCount} 个`;
 
         seenMessageUids.current = mergeSeenMessageUids(seenMessageUids.current, sortedMessages);
         hasLoadedMailbox.current = true;
@@ -155,7 +154,6 @@ function App() {
         setEmailMessages(sortedMessages);
         setMailListStats({
           scannedMessages: result.scannedMessages,
-          nonOrderExcelAttachmentCount,
         });
         setSelectedMessageUids((current) => new Set([...current].filter((uid) => validUids.has(uid) && !activeExtractedMessageUids.has(uid))));
         setNewMessageUids((current) => {
@@ -165,10 +163,10 @@ function App() {
           }
           return next;
         });
-        setMailStatus(shouldAlertNewMessages ? `发现 ${newPendingMessages.length} 封新订单邮件，${baseMailStatus}` : baseMailStatus);
+        setMailStatus(shouldAlertNewMessages ? `发现 ${newPendingMessages.length} 封新候选邮件，${baseMailStatus}` : baseMailStatus);
         if (shouldAlertNewMessages) {
           const notification = buildNewOrderEmailNotification(newPendingMessages);
-          appendLog(`发现新订单邮件：${newPendingMessages.map((message) => message.subject || "(无主题)").join(" / ")}`);
+          appendLog(`发现新候选邮件：${newPendingMessages.map((message) => message.subject || "(无主题)").join(" / ")}`);
           void api
             .notifyNewOrderEmails(notification)
             .then((shown) => {
@@ -512,8 +510,8 @@ function App() {
                 <div className="empty-mail-list">
                   {canUseEmail
                     ? emailMessages.length === 0
-                      ? "暂无近一周订单邮件，点击刷新邮件重试。"
-                      : `${mailDayTitle}暂无订单邮件。`
+                      ? "暂无近一周 Excel 候选邮件，点击刷新邮件重试。"
+                      : `${mailDayTitle}暂无候选邮件。`
                     : "填写邮箱和授权码后显示邮件。"}
                 </div>
               ) : (
@@ -550,7 +548,7 @@ function App() {
                           <span>{message.from || "未知发件人"}</span>
                         </div>
                         <div className="attachment-line">
-                          {message.hasExcelAttachments ? message.excelAttachmentNames.join(" / ") : "无订单附件"}
+                          {message.hasExcelAttachments ? message.excelAttachmentNames.join(" / ") : "无 Excel 候选附件"}
                         </div>
                       </div>
                     </div>

@@ -52,7 +52,8 @@ describe("renderer React stack", () => {
     expect(appSource).toContain("下一天");
     expect(appSource).toContain("保存邮箱后加载今日邮件");
     expect(appSource).toContain("近一周扫描");
-    expect(appSource).toContain("非订单附件");
+    expect(appSource).toContain("候选邮件");
+    expect(appSource).toContain("Excel 候选附件");
     expect(appSource).toContain("提取选中 ${selectedExtractableUids.length} 封");
     expect(appSource).toContain("失败原因");
     expect(appSource).toContain("resultFailures");
@@ -96,8 +97,8 @@ describe("renderer React stack", () => {
     expect(appSource).not.toContain("保存邮箱后会自动加载邮件");
     expect(appSource).not.toContain("提取今日");
     expect(appSource).toContain("每 5 分钟自动刷新");
-    expect(appSource).toContain("订单邮件");
-    expect(appSource).toContain("订单附件");
+    expect(appSource).toContain("候选邮件");
+    expect(appSource).toContain("Excel 候选附件");
 expect(appSource).toContain("messageUids");
 expect(appSource).toContain("listEmails");
 expect(appSource).toContain("正在下载新版程序");
