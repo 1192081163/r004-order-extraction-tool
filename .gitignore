@@ -13,6 +13,7 @@ node_modules/
 build/
 dist/
 release/
+python-helper/
 *.spec.bak
 *.zip
 *.dmg

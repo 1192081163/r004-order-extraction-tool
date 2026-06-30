@@ -26,4 +26,4 @@ When adding tests, use minimal synthetic workbooks or anonymized fixtures that d
 
 ## Release Notes
 
-GitHub Actions owns release publishing for the Windows portable executable. CircleCI is configured for checks and artifacts only; it should not create GitHub releases.
+GitHub Actions owns release publishing for the Windows portable executable and macOS DMG. CircleCI is configured for checks and artifacts only; it should not create GitHub releases.

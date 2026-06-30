@@ -517,6 +517,13 @@ def width_value(value: Any) -> float:
     return float(num or 0)
 
 
+def worksheet_row_over_size_width(ws: Any, idx: int) -> float:
+    width = width_value(ws[f"G{idx}"].value)
+    if worksheet_row_is_cavity(ws, idx):
+        width = max(width, width_value(ws[f"I{idx}"].value))
+    return width
+
+
 def worksheet_over_size_qty(ws: Any) -> float:
     qty_total = 0.0
     for idx in worksheet_rows(ws):
@@ -526,8 +533,8 @@ def worksheet_over_size_qty(ws: Any) -> float:
         if qty <= 0:
             continue
         # G is reveal width in the standard table. In cavity rows I is overall width;
-        # in standard rows I is hinge qty, so including it does not affect the threshold.
-        max_width = max(width_value(ws[f"G{idx}"].value), width_value(ws[f"I{idx}"].value))
+        # in standard rows I is hinge qty and must not count toward the threshold.
+        max_width = worksheet_row_over_size_width(ws, idx)
         if max_width > OVER_SIZE_WIDTH_THRESHOLD:
             qty_total += float(qty)
     return qty_total
@@ -1309,7 +1316,7 @@ def extract_worksheet_workbook(path: Path, row: ExtractedRow, wb: Any, infer_man
             if is_replacement_head_only(profile, row_context(ws, idx)):
                 goods_bucket = None
             add_goods(goods_totals, goods_bucket, qty)
-            max_width = max(width_value(ws[f"G{idx}"].value), width_value(ws[f"I{idx}"].value))
+            max_width = worksheet_row_over_size_width(ws, idx)
             if qty > 0 and max_width > OVER_SIZE_WIDTH_THRESHOLD:
                 over_size_qty += float(qty)
 
@@ -2078,10 +2085,10 @@ def sheet1_numeric_part_columns(ws: Any, header_row: int) -> list[int]:
 def sheet1_dyna_hardware_multiplier(header: str) -> int | None:
     normalized = re.sub(r"[^A-Z0-9]+", " ", header.upper()).strip()
     tokens = set(normalized.split())
-    if {"CSK", "DTNA"}.issubset(tokens):
-        return 2
     if "CSK" in tokens and "DYNA" in tokens and "TUBE" in tokens:
         return 4
+    if "CSK" in tokens and ("DYNA" in tokens or "DTNA" in tokens):
+        return 2
     if "DYNA" in tokens and ("TRADITION" in tokens or "TRAD" in tokens):
         return 1
     return None
@@ -2112,6 +2119,29 @@ def sheet1_header_keeps_decimal_parts(header: str) -> bool:
 
 def sheet1_table_has_trad_dyna(ws: Any, header_row: int) -> bool:
     return any("TRAD DYNA" in sheet1_header_text(ws, header_row, col_idx) for col_idx in range(1, ws.max_column + 1))
+
+
+def sheet1_trad_dyna_columns(ws: Any, header_row: int) -> list[int]:
+    return [
+        col_idx
+        for col_idx in range(1, ws.max_column + 1)
+        if "TRAD DYNA" in sheet1_header_text(ws, header_row, col_idx)
+    ]
+
+
+def sheet1_trad_dyna_each_jamb_qty(value: Any) -> float:
+    text = clean_text(value).upper()
+    match = re.search(r"(\d+(?:\.\d+)?)\s*EACH\s+JAMB\b", text)
+    return float(match.group(1)) if match else 0.0
+
+
+def sheet1_es2100_trad_dyna_striker_qty(ws: Any, row_idx: int, header_row: int, striker_cols: list[int]) -> float:
+    if not any("ES2100" in clean_text(ws.cell(row_idx, col).value).upper() for col in striker_cols):
+        return 0.0
+    return max(
+        (sheet1_trad_dyna_each_jamb_qty(ws.cell(row_idx, col).value) for col in sheet1_trad_dyna_columns(ws, header_row)),
+        default=0.0,
+    )
 
 
 def sheet1_table_has_offset_brick_ties(ws: Any, header_row: int) -> bool:
@@ -2263,6 +2293,7 @@ def sheet1_line_hardware_totals(
         striker_qty = sum(sheet1_hardware_item_count(ws.cell(row_idx, col).value) for col in striker_cols)
     else:
         striker_qty = 1 if any(has_value(ws.cell(row_idx, col).value) for col in striker_cols) else 0
+    striker_qty = max(striker_qty, sheet1_es2100_trad_dyna_striker_qty(ws, row_idx, header_row, striker_cols))
     sill_qty = 1 if any(has_value(ws.cell(row_idx, col).value) for col in sill_cols) else 0
     trad_dyna_backing_plate_qty = sum(sheet1_hardware_item_count(ws.cell(row_idx, col).value) for col in trad_dyna_backing_plate_cols)
     brick_tie_qty = sum(sheet1_brick_tie_qty(ws.cell(row_idx, col).value) for col in brick_tie_cols)

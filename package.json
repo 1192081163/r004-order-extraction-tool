@@ -29,7 +29,10 @@
     "dist": "npm run dist:win",
     "dist:win": "npm run build && electron-builder --win portable",
     "dist:win:ci": "npm run build && electron-builder --win portable --publish never",
+    "dist:mac": "npm run build && electron-builder --mac dmg",
+    "dist:mac:ci": "npm run build && electron-builder --mac dmg --publish never",
     "pack:win": "electron-builder --win portable --publish never",
+    "pack:mac": "electron-builder --mac dmg --publish never",
     "serve:email-api": "npm run build:main && node dist/server/main.js",
     "start": "npm run build && electron .",
     "test": "vitest run --config vitest.config.ts",
@@ -101,8 +104,19 @@
       ],
       "icon": "assets/app_icon.ico"
     },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "icon": "assets/app_icon.icns",
+      "category": "public.app-category.productivity",
+      "identity": null
+    },
     "portable": {
       "artifactName": "orderflow-desktop-windows.${ext}"
+    },
+    "dmg": {
+      "artifactName": "orderflow-desktop-mac.${ext}"
     }
   }
 }

@@ -2,15 +2,16 @@
 
 可视化桌面工具，用来从企业微信邮箱或本地订单 Excel 提取订单信息，并自动生成订单整理结果。
 
-## 下载 Windows 便携版
+## 下载桌面版
 
 普通用户不需要安装 Node.js、Python 或开发依赖。打开 [Latest Release](https://github.com/1192081163/orderflow-desktop/releases/latest)，下载：
 
 ```text
 orderflow-desktop-windows.exe
+orderflow-desktop-mac.dmg
 ```
 
-下载后双击这个 exe 就会直接打开软件，不会出现安装向导。运行环境已经内置在 exe 中，首次打开后填写企业微信邮箱和邮箱授权码，或直接拖入本地 Excel 文件提取订单。
+Windows 下载后双击 exe 就会直接打开软件，不会出现安装向导。Mac 下载 DMG 后拖入 Applications 打开；当前 Mac 包未做 Apple 公证，首次打开如果被系统拦截，可右键选择打开。运行环境已经内置在软件中，首次打开后填写企业微信邮箱和邮箱授权码，或直接拖入本地 Excel 文件提取订单。
 
 ## 使用方式
 
@@ -66,12 +67,30 @@ npm run dist:win
 release/orderflow-desktop-windows.exe
 ```
 
+## macOS 打包
+
+在 macOS 上运行：
+
+```bash
+npm install
+python3 -m pip install -r requirements-python-runner.txt
+bash ./scripts/build-python-runner-mac.sh
+npm run dist:mac
+```
+
+打包结果是 DMG：
+
+```text
+release/orderflow-desktop-mac.dmg
+```
+
 ## GitHub Release
 
-推送到 `main` 后，GitHub Actions 会自动测试、打包，并创建新的 Latest Release。Release 页面只保留面向用户的 Windows 便携版 exe 下载入口：
+推送到 `main` 后，GitHub Actions 会自动测试、打包，并创建新的 Latest Release。Release 页面保留面向用户的 Windows 便携版 exe 和 macOS DMG 下载入口：
 
 ```text
 orderflow-desktop-windows.exe
+orderflow-desktop-mac.dmg
 ```
 
 ## 文件说明

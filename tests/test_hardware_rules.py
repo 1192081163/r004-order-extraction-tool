@@ -709,6 +709,18 @@ def worksheet_book() -> Workbook:
     return wb
 
 
+def test_standard_worksheet_hinge_qty_is_not_over_size_width(tmp_path: Path) -> None:
+    wb = worksheet_book()
+    ws = wb["Worksheet"]
+    values = ["1.6mm Zinc", "", 1, "Commercial", "", 2060, 923, "RIGHT", 1670, "HINGE PREP", "S1", 1000]
+    for col, value in enumerate(values, start=1):
+        ws.cell(11, col).value = value
+
+    row = extract.extract_workbook(save_workbook(wb, tmp_path / "worksheet-commercial-hinge-qty.xlsx"), infer_manual=True)
+
+    assert row.values[7] is None
+
+
 def test_standard_worksheet_scans_material_from_zero_qty_rows_and_notes(tmp_path: Path) -> None:
     wb = worksheet_book()
     ws = wb["Worksheet"]
@@ -1377,6 +1389,53 @@ def test_sheet1_csk_dyna_tube_counts_four_parts_per_quantity(tmp_path: Path) -> 
     assert row.values[20] == 40
 
 
+def test_main_sheet_csk_dyna_counts_two_parts_per_quantity(tmp_path: Path) -> None:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Main Sheet"
+    ws["A1"] = "AUSMET JOB # 30557 REV00"
+    ws["A2"] = "Builder:"
+    ws["B2"] = "Australian Fire Door Company"
+    ws["A4"] = "Delivery Address:"
+    ws["B4"] = "16 Rehill Road, Maddington"
+    ws["A5"] = "Delivery Date:"
+    ws["B5"] = dt.date(2026, 6, 26)
+    ws["A6"] = "Purchase Order:"
+    ws["B6"] = "DC 3248"
+    ws["A9"] = "Material:"
+    ws["B9"] = "1.6mm Zinc"
+    for col, value in enumerate(
+        [
+            "Door #",
+            "PROFILE",
+            "OVERALL HEIGHT",
+            "OVERALL WIDTH",
+            "HAND",
+            "HINGE QTY",
+            "BACKING PLATE TO SUIT",
+            "STRIKER TYPE",
+            "STRIKER HEIGHT",
+            "CSK DYNA",
+        ],
+        start=1,
+    ):
+        ws.cell(12, col).value = value
+    rows = {
+        13: ["D1", "A", 2120, 1010, "LEFT", 4, "100X100X2.5", "S1", 1030, "13 (5 TO EACH JAMB + 3 TO HEAD)"],
+        14: ["D2", "A", 2120, 1010, "LEFT", 4, "100X100X2.5", "S1", 1030, "13 (5 TO EACH JAMB + 3 TO HEAD)"],
+        15: ["D3", "A", 2110, 1010, "LEFT", 4, "100X100X2.5", "S1", 1030, "13 (5 TO EACH JAMB + 3 TO HEAD)"],
+        16: ["D4", "B", 2082, 997, "RIGHT", 4, "100X100X2.5", "S1", 1030, "13 (5 TO EACH JAMB + 3 TO HEAD)"],
+        17: ["D5", "B", 2074, 996, "RIGHT", 4, "100X100X2.5", "S1", 1030, "13 (5 TO EACH JAMB + 3 TO HEAD)"],
+    }
+    for row_idx, values in rows.items():
+        for col, value in enumerate(values, start=1):
+            ws.cell(row_idx, col).value = value
+
+    row = extract.extract_workbook(save_workbook(wb, tmp_path / "csk-dyna-main.xlsx"), infer_manual=True)
+
+    assert row.values[21] == 135
+
+
 def test_sheet1_tradition_dyna_counts_one_part_per_quantity(tmp_path: Path) -> None:
     wb = sheet1_profile_book()
     ws = wb["Sheet1"]
@@ -1537,6 +1596,51 @@ def test_wire_ties_are_not_counted_when_trad_dyna_column_exists(tmp_path: Path) 
     row = extract.extract_workbook(save_workbook(wb, tmp_path / "trad-dyna-wire-ties.xlsx"), infer_manual=True)
 
     assert row.values[21] == 31
+
+
+def test_trad_dyna_es2100_uses_each_jamb_qty_for_striker(tmp_path: Path) -> None:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Main Sheet"
+    ws["A1"] = "AUMSET JOB # 30534 REV00"
+    ws["A2"] = "Builder:"
+    ws["B2"] = "Australian Fire Door Company"
+    ws["A4"] = "Delivery Address:"
+    ws["B4"] = "03c AFDC, Chalkley Place Bayswater"
+    ws["A5"] = "Delivery Date:"
+    ws["B5"] = dt.date(2026, 6, 26)
+    ws["A6"] = "Purchase Order:"
+    ws["B6"] = "SO 7421"
+    ws["A9"] = "Material:"
+    ws["B9"] = "1.6mm Zinc"
+    for col, value in enumerate(
+        [
+            "Door #",
+            "PROFILE",
+            "OVERALL HEIGHT",
+            "OVERALL WIDTH",
+            "HAND",
+            "HINGE QTY",
+            "BACKING PLATE TO SUIT",
+            "STRIKER TYPE",
+            "STRIKER HEIGHT",
+            "TRAD DYNA",
+        ],
+        start=1,
+    ):
+        ws.cell(12, col).value = value
+    rows = {
+        13: ["SO_7421/1.18 STAIR 4", "A", 2100, 1005, "RIGHT", 4, "100X100X2.5", "ES2100", 1020, "13 (5 EACH JAMB + 3 IN HEAD)"],
+        14: ["SO_7421/01.14A STAIR 1", "C", 2100, 1005, "LEFT", 4, "100X100X2.5", "ES2100", 1020, "13 (5 EACH JAMB + 3 IN HEAD)"],
+        15: ["SO_7421/01.14B FIRE CNTR", "D", 2100, 1005, "LEFT", 4, "100X100X2.5", "ES2100", 1020, "13 (5 EACH JAMB + 3 IN HEAD)"],
+    }
+    for row_idx, values in rows.items():
+        for col, value in enumerate(values, start=1):
+            ws.cell(row_idx, col).value = value
+
+    row = extract.extract_workbook(save_workbook(wb, tmp_path / "trad-dyna-es2100.xlsx"), infer_manual=True)
+
+    assert row.values[21] == 54
 
 
 def test_trad_dyna_backing_plate_is_not_counted_in_brick_tables(tmp_path: Path) -> None:

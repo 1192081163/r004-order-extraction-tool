@@ -43,16 +43,17 @@ export async function runPythonOrderExtraction(
 }
 
 function resolvePythonCommand(): PythonCommand {
-  const bundledRunner = findBundledRunner();
-  if (bundledRunner) {
-    return { command: bundledRunner, argsPrefix: [] };
-  }
-
   const scriptPath = findBridgeScript();
   const configuredPython = process.env.ORDER_ORGANIZER_PYTHON?.trim();
   if (configuredPython) {
     return { command: configuredPython, argsPrefix: [scriptPath] };
   }
+
+  const bundledRunner = findBundledRunner();
+  if (bundledRunner) {
+    return { command: bundledRunner, argsPrefix: [] };
+  }
+
   if (process.platform === "win32") {
     return { command: "py", argsPrefix: ["-3", scriptPath] };
   }
@@ -71,12 +72,14 @@ export function resolvePythonExecutionCwd(
 }
 
 function findBundledRunner(): string | null {
+  const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+  if (!resourcesPath) {
+    return null;
+  }
   const runnerName = process.platform === "win32" ? "order-python-runner.exe" : "order-python-runner";
-  for (const baseDir of resourceRoots()) {
-    const candidate = path.join(baseDir, "python-helper", runnerName);
-    if (existsSync(candidate)) {
-      return candidate;
-    }
+  const candidate = path.join(resourcesPath, "python-helper", runnerName);
+  if (existsSync(candidate)) {
+    return candidate;
   }
   return null;
 }
