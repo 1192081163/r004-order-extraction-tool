@@ -150,11 +150,15 @@ export class RemoteEmailApiClient {
       headers.Authorization = `Bearer ${this.token}`;
     }
 
-    const response = await fetch(`${this.baseUrl}${pathname}`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-    });
+    const response = await fetchRemote(
+      `${this.baseUrl}${pathname}`,
+      {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+      },
+      this.baseUrl,
+    );
     const text = await response.text();
     const payload = text ? JSON.parse(text) : undefined;
 
@@ -165,6 +169,14 @@ export class RemoteEmailApiClient {
     }
 
     return payload as T;
+  }
+}
+
+async function fetchRemote(url: string, init: RequestInit, baseUrl: string): Promise<Response> {
+  try {
+    return await fetch(url, init);
+  } catch {
+    throw new Error(`无法连接远程邮件服务 ${baseUrl}，请检查服务地址、网络连接或远程服务是否已启动。`);
   }
 }
 

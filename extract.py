@@ -75,7 +75,9 @@ MANUAL_OR_SCHEDULED_COLUMNS = {
     23,  # X hardware bucket
 }
 
-OVER_SIZE_WIDTH_THRESHOLD = 1024
+OVER_SIZE_REVEAL_WIDTH_THRESHOLD = 1220
+OVER_SIZE_OVERALL_WIDTH_THRESHOLD = 1300
+OVER_SIZE_WIDTH_THRESHOLD = OVER_SIZE_REVEAL_WIDTH_THRESHOLD
 OVER_SIZE_CONCEALED_HEIGHT_THRESHOLD = 2400
 CAVITY_SLIDER_MITRE_QTY = 14
 
@@ -503,7 +505,7 @@ def workbook_over_size_marker(wb: Any) -> str | None:
 
 
 def write_over_size(row: ExtractedRow, marker: str | None, qty: float = 0.0) -> None:
-    # Tracking H is mostly the count of rows with width > 1024; packaging notes use text.
+    # Tracking H counts reveal width > 1220 or overall width > 1300; packaging notes use text.
     if marker in {"glut", "pallet", "stillages"}:
         row.values[7] = marker
     elif qty:
@@ -517,11 +519,34 @@ def width_value(value: Any) -> float:
     return float(num or 0)
 
 
-def worksheet_row_over_size_width(ws: Any, idx: int) -> float:
-    width = width_value(ws[f"G{idx}"].value)
-    if worksheet_row_is_cavity(ws, idx):
-        width = max(width, width_value(ws[f"I{idx}"].value))
-    return width
+def over_size_width_threshold(header: Any) -> int:
+    return OVER_SIZE_OVERALL_WIDTH_THRESHOLD if "OVERALL" in clean_text(header).upper() else OVER_SIZE_REVEAL_WIDTH_THRESHOLD
+
+
+def width_column_header_text(ws: Any, col_idx: int, header_row: int | None = None) -> str:
+    if header_row is not None:
+        return f"{clean_text(ws.cell(header_row, col_idx).value)} {clean_text(ws.cell(header_row + 1, col_idx).value)}"
+    parts: list[str] = []
+    for row_idx in range(1, min(ws.max_row, 40) + 1):
+        if row_is_hidden(ws, row_idx):
+            continue
+        text = clean_text(ws.cell(row_idx, col_idx).value)
+        if text:
+            parts.append(text)
+    return " ".join(parts)
+
+
+def row_has_over_size_width(ws: Any, row_idx: int, width_cols: list[int], header_row: int | None = None) -> bool:
+    return any(
+        width_value(ws.cell(row_idx, col_idx).value) > over_size_width_threshold(width_column_header_text(ws, col_idx, header_row))
+        for col_idx in width_cols
+    )
+
+
+def worksheet_row_is_over_size(ws: Any, idx: int) -> bool:
+    if width_value(ws[f"G{idx}"].value) > OVER_SIZE_REVEAL_WIDTH_THRESHOLD:
+        return True
+    return worksheet_row_is_cavity(ws, idx) and width_value(ws[f"I{idx}"].value) > OVER_SIZE_OVERALL_WIDTH_THRESHOLD
 
 
 def worksheet_over_size_qty(ws: Any) -> float:
@@ -534,8 +559,7 @@ def worksheet_over_size_qty(ws: Any) -> float:
             continue
         # G is reveal width in the standard table. In cavity rows I is overall width;
         # in standard rows I is hinge qty and must not count toward the threshold.
-        max_width = worksheet_row_over_size_width(ws, idx)
-        if max_width > OVER_SIZE_WIDTH_THRESHOLD:
+        if worksheet_row_is_over_size(ws, idx):
             qty_total += float(qty)
     return qty_total
 
@@ -591,8 +615,7 @@ def cavity_without_profile_over_size_qty(ws: Any) -> float:
             first = clean_text(ws.cell(row_idx, 1).value)
             if not first or first.upper().startswith(("DOOR", "MATERIAL")):
                 break
-            max_width = max([width_value(ws.cell(row_idx, col).value) for col in width_cols] or [0])
-            if max_width > OVER_SIZE_WIDTH_THRESHOLD:
+            if row_has_over_size_width(ws, row_idx, width_cols, header_row):
                 qty_total += 1
     return qty_total
 
@@ -620,8 +643,7 @@ def profile_tables_over_size_qty(ws: Any) -> float:
             product_qty = sheet1_product_qty(ws, idx, profile_col, product_qty_col)
             if product_qty <= 0:
                 continue
-            max_width = max([width_value(ws.cell(idx, col).value) for col in width_cols] or [0])
-            if max_width > OVER_SIZE_WIDTH_THRESHOLD or main_row_counts_concealed_height_over_size(ws, idx, height_cols):
+            if row_has_over_size_width(ws, idx, width_cols, header_row) or main_row_counts_concealed_height_over_size(ws, idx, height_cols):
                 qty_total += float(product_qty)
     for header_row, profile_col in find_sheet1_profileless_table_headers(ws):
         product_qty_col = sheet1_product_qty_column(ws, header_row, profile_col)
@@ -640,8 +662,7 @@ def profile_tables_over_size_qty(ws: Any) -> float:
             product_qty = sheet1_product_qty(ws, idx, profile_col, product_qty_col)
             if product_qty <= 0:
                 continue
-            max_width = max([width_value(ws.cell(idx, col).value) for col in width_cols] or [0])
-            if max_width > OVER_SIZE_WIDTH_THRESHOLD:
+            if row_has_over_size_width(ws, idx, width_cols, header_row):
                 qty_total += float(product_qty)
     return qty_total + cavity_without_profile_over_size_qty(ws)
 
@@ -716,7 +737,7 @@ def main_old_overall_double_width_qty(ws: Any) -> float:
             if "DOUBLE" not in clean_text(ws.cell(idx, hand_col).value).upper():
                 continue
             max_width = max([width_value(ws.cell(idx, col).value) for col in width_cols] or [0])
-            if max_width > OVER_SIZE_WIDTH_THRESHOLD:
+            if max_width > OVER_SIZE_OVERALL_WIDTH_THRESHOLD:
                 qty_total += 1
         if qty_total:
             return qty_total
@@ -738,8 +759,7 @@ def main_fallback_over_size_qty(ws: Any) -> float:
     height_cols = main_height_columns(ws)
     qty_total = main_old_overall_double_width_qty(ws)
     for idx in iter_main_detail_rows(ws):
-        max_width = max([width_value(ws.cell(idx, col).value) for col in width_cols] or [0])
-        if max_width > OVER_SIZE_WIDTH_THRESHOLD or main_row_counts_concealed_height_over_size(ws, idx, height_cols):
+        if row_has_over_size_width(ws, idx, width_cols) or main_row_counts_concealed_height_over_size(ws, idx, height_cols):
             qty_total += 1
     return qty_total + cavity_without_profile_over_size_qty(ws)
 
@@ -1121,6 +1141,15 @@ def profile_is_deluxe_dry_lining(profile: Any) -> bool:
     return "DRY LINING" in upper or "DR LINING" in upper
 
 
+def is_screw_fix_profile(profile: Any) -> bool:
+    upper = clean_text(profile).upper()
+    return bool(re.search(r"\bSCREW\b.*\bFIX(?:ED)?\b|\bFIX(?:ED)?\b.*\bSCREW\b", upper))
+
+
+def kd_x_parts_multiplier(profile: Any) -> int:
+    return 7 if is_screw_fix_profile(profile) else 4
+
+
 def worksheet_goods_bucket(profile: Any, goods: str | None) -> str | None:
     if goods == "DELUXE" and profile_is_deluxe_dry_lining(profile):
         return "DELUXE DRY LINING"
@@ -1316,8 +1345,7 @@ def extract_worksheet_workbook(path: Path, row: ExtractedRow, wb: Any, infer_man
             if is_replacement_head_only(profile, row_context(ws, idx)):
                 goods_bucket = None
             add_goods(goods_totals, goods_bucket, qty)
-            max_width = worksheet_row_over_size_width(ws, idx)
-            if qty > 0 and max_width > OVER_SIZE_WIDTH_THRESHOLD:
+            if qty > 0 and worksheet_row_is_over_size(ws, idx):
                 over_size_qty += float(qty)
 
         line_v = 0.0
@@ -1333,7 +1361,7 @@ def extract_worksheet_workbook(path: Path, row: ExtractedRow, wb: Any, infer_man
             line_v += deluxe_cleats_extra_parts(path, profile, goods, qty)
             v_total += line_v
             if goods == "KD" and qty > 0:
-                x_total += qty * 4
+                x_total += qty * kd_x_parts_multiplier(profile)
 
         is_double = clean_text(ws[f"O{idx}"].value).upper() == "YES"
         if qty > 0 and is_double:
@@ -2449,7 +2477,7 @@ def extract_profile_tables(ws: Any, row: ExtractedRow, infer_manual: bool = Fals
             v_total += line_v
             w_total += line_w
             if goods == "KD":
-                x_total += product_qty * 4
+                x_total += product_qty * kd_x_parts_multiplier(profile)
             if ws.title == "Sheet1" and any(
                 "HOLES" in sheet1_header_text(ws, header_row, col_idx) and has_value(ws.cell(idx, col_idx).value)
                 for col_idx in range(1, ws.max_column + 1)
@@ -2525,7 +2553,7 @@ def extract_profile_tables(ws: Any, row: ExtractedRow, infer_manual: bool = Fals
             v_total += line_v
             w_total += line_w
             if goods == "KD":
-                x_total += product_qty * 4
+                x_total += product_qty * kd_x_parts_multiplier(profile)
             if ws.title == "Main Sheet" and goods == "COMMERCIAL" and line_w:
                 row.parts_w_multiplier = 1.0
 
@@ -2966,7 +2994,7 @@ def main() -> int:
     parser.add_argument(
         "--infer-manual",
         action="store_true",
-        help="Best-effort fill for supported manual/scheduled columns such as H/P/Q/T/U/V/W/X; H Over Size uses width > 1024 and packaging notes; T/U/V/W/X use the tracking workbook's 0-decimal display style.",
+        help="Best-effort fill for supported manual/scheduled columns such as H/P/Q/T/U/V/W/X; H Over Size uses reveal width > 1220, overall width > 1300, and packaging notes; T/U/V/W/X use the tracking workbook's 0-decimal display style.",
     )
     args = parser.parse_args()
 

@@ -1370,20 +1370,109 @@ describe("extractWorkbook", () => {
     expect(row.values.slice(19, 24)).toEqual([0, 3, null, null, 8]);
   });
 
-  test("fills Worksheet over-size quantity from reveal width", async () => {
-    const filePath = path.join(tempRoot, "29698 oversize.xlsx");
+  test("fills Worksheet screw fix KD rows into X bucket at seven per quantity", async () => {
+    const filePath = path.join(tempRoot, "29698 kd screw fix.xlsx");
     await makeWorksheetOrderWithLines(filePath, [
       {
         material: "1.05mm Zincanneal",
+        qty: 1,
+        profile: "Modern Knock Down - Screw Fix",
+        revealWidth: 723,
+        hingeQty: "2",
+        hingeType: "WELDED",
+        strikerType: "S1",
+        sill: "NO",
+      },
+      {
+        material: "1.05mm Zincanneal",
         qty: 2,
-        profile: "Modern",
-        revealWidth: 1200,
+        profile: "Modern Knock Down - Screw Fix",
+        revealWidth: 723,
+        hingeQty: "2",
+        hingeType: "WELDED",
+        strikerType: "S1",
+        sill: "NO",
+      },
+      {
+        material: "1.05mm Zincanneal",
+        qty: 3,
+        profile: "Modern Knock Down - Screw Fix",
+        revealWidth: 823,
+        hingeQty: "2",
+        hingeType: "WELDED",
+        strikerType: "S1",
+        sill: "NO",
       },
     ]);
 
     const row = await extractWorkbook(filePath, { inferManual: true });
 
-    expect(row.values[7]).toBe(2);
+    expect(row.values[11]).toBe("KD");
+    expect(row.values[23]).toBe(42);
+  });
+
+  test("fills Worksheet over-size quantity only when reveal width is over 1220", async () => {
+    const filePath = path.join(tempRoot, "29698 oversize.xlsx");
+    await makeWorksheetOrderWithLines(filePath, [
+      {
+        material: "1.05mm Zincanneal",
+        qty: 1,
+        profile: "Modern",
+        revealWidth: 1203,
+      },
+      {
+        material: "1.05mm Zincanneal",
+        qty: 2,
+        profile: "Modern",
+        revealWidth: 1220,
+      },
+      {
+        material: "1.05mm Zincanneal",
+        qty: 3,
+        profile: "Modern",
+        revealWidth: 1221,
+      },
+    ]);
+
+    const row = await extractWorkbook(filePath, { inferManual: true });
+
+    expect(row.values[7]).toBe(3);
+  });
+
+  test("does not count Sheet1 reveal width 1203 as over-size", async () => {
+    const filePath = path.join(tempRoot, "29698 sheet1 reveal threshold.xlsx");
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Sheet1");
+    ws.getCell("A1").value = "Job # 29698";
+    ws.getCell("A6").value = "Material";
+    ws.getCell("B6").value = "1.05mm Zincanneal";
+    [
+      "Door #",
+      "PROFILE",
+      "OVERALL HEIGHT",
+      "REVEAL WIDTH",
+      "HAND",
+      "HINGE QTY",
+      "WELDED HINGES",
+      "STRIKER TYPE",
+      "STRIKER HEIGHT",
+    ].forEach((value, index) => {
+      ws.getCell(12, index + 1).value = value;
+    });
+    [
+      ["D1", "A", 2229, 1203, "RIGHT", 4, "100X75X1.6", "-", "-"],
+      ["D2", "A", 2229, 1220, "LEFT", 4, "100X75X1.6", "-", "-"],
+      ["D3", "A", 2229, 1221, "RIGHT", 4, "100X75X1.6", "-", "-"],
+    ].forEach((values, rowOffset) => {
+      values.forEach((value, index) => {
+        ws.getCell(13 + rowOffset, index + 1).value = value;
+      });
+    });
+    await wb.xlsx.writeFile(filePath);
+
+    const row = await extractWorkbook(filePath, { inferManual: true });
+
+    expect(row.values[7]).toBe(1);
   });
 
   test("marks double rows for over-size manual review when no marker exists", async () => {

@@ -8,6 +8,9 @@ import { defaultOutputPaths } from "./outputPaths.js";
 import { sortExtractedRowsByIdealDate } from "./rowSorting.js";
 import { writeAuditCsv, writeCsv, writeXlsx } from "./writers.js";
 
+const OVER_SIZE_REVEAL_WIDTH_THRESHOLD = 1220;
+const OVER_SIZE_OVERALL_WIDTH_THRESHOLD = 1300;
+
 const BUILDER_ALIASES: Record<string, string> = {
   "a&m construction group": "A&M",
   "aart homes": "AART",
@@ -686,7 +689,7 @@ function extractProfileTableLines(worksheet: ExcelJS.Worksheet, sourceFile: stri
         material: material || cavityDefaultMaterial || "",
         quantity,
         profile,
-        revealWidth: maxWidthText(worksheet, row, widthColumns),
+        revealWidth: maxWidthText(worksheet, row, widthColumns, header.row),
         hingeQty: hingeColumn ? cellText(worksheet.getCell(row, hingeColumn).value) : "",
         hingeType: hasHingePlates ? "HINGE PLATE" : "",
         strikerType: strikerColumn ? cellText(worksheet.getCell(row, strikerColumn).value) : "",
@@ -748,7 +751,7 @@ function extractProfileTableLines(worksheet: ExcelJS.Worksheet, sourceFile: stri
         material: material || cavityDefaultMaterial || "",
         quantity,
         profile,
-        revealWidth: maxWidthText(worksheet, row, widthColumns),
+        revealWidth: maxWidthText(worksheet, row, widthColumns, header.row),
         hingeQty: hingeColumn ? cellText(worksheet.getCell(row, hingeColumn).value) : "",
         hingeType: hasHingePlates ? "HINGE PLATE" : "",
         strikerType: strikerColumn ? cellText(worksheet.getCell(row, strikerColumn).value) : "",
@@ -919,8 +922,9 @@ function mainFallbackWidthColumns(worksheet: ExcelJS.Worksheet): number[] {
 }
 
 function mainFallbackRowIsOverSize(worksheet: ExcelJS.Worksheet, row: number, widthColumns: number[]): boolean {
-  const maxWidth = Math.max(0, ...widthColumns.map((column) => numberValue(worksheet.getCell(row, column).value) ?? 0));
-  return maxWidth > 1024;
+  return widthColumns.some((column) =>
+    widthExceedsOverSizeThreshold(worksheet.getCell(row, column).value, widthColumnContext(worksheet, column)),
+  );
 }
 
 function findProfileHeaders(worksheet: ExcelJS.Worksheet): Array<{ row: number; column: number }> {
@@ -1265,8 +1269,38 @@ function findWidthColumns(worksheet: ExcelJS.Worksheet, headerRow: number): numb
   return columns;
 }
 
-function maxWidthText(worksheet: ExcelJS.Worksheet, row: number, columns: number[]): string {
-  const maxWidth = Math.max(0, ...columns.map((column) => numberValue(worksheet.getCell(row, column).value) ?? 0));
+function overSizeWidthThreshold(header: string): number {
+  return cleanText(header).toUpperCase().includes("OVERALL") ? OVER_SIZE_OVERALL_WIDTH_THRESHOLD : OVER_SIZE_REVEAL_WIDTH_THRESHOLD;
+}
+
+function widthColumnContext(worksheet: ExcelJS.Worksheet, column: number): string {
+  const parts: string[] = [];
+  for (let row = 1; row <= Math.min(worksheet.rowCount, 40); row += 1) {
+    if (rowIsHidden(worksheet, row)) {
+      continue;
+    }
+    const text = cellText(worksheet.getCell(row, column).value);
+    if (text) {
+      parts.push(text);
+    }
+  }
+  return parts.join(" ");
+}
+
+function widthExceedsOverSizeThreshold(value: ExcelJS.CellValue, header: string): boolean {
+  const width = numberValue(value);
+  return width !== null && width > overSizeWidthThreshold(header);
+}
+
+function maxWidthText(worksheet: ExcelJS.Worksheet, row: number, columns: number[], headerRow?: number): string {
+  const maxWidth = Math.max(
+    0,
+    ...columns.map((column) => {
+      const width = numberValue(worksheet.getCell(row, column).value) ?? 0;
+      const header = headerRow === undefined ? widthColumnContext(worksheet, column) : sheetHeaderText(worksheet, headerRow, column);
+      return width > overSizeWidthThreshold(header) ? width : 0;
+    }),
+  );
   return maxWidth > 0 ? String(maxWidth) : "";
 }
 
@@ -1716,6 +1750,15 @@ function createManualTotals(): ManualTotals {
   return { mitre: 0, v: 0, w: 0, weightedWParts: 0, x: 0, overSizeQty: 0, overSizeMarker: null, doubleQty: 0 };
 }
 
+function isScrewFixProfile(profile: string): boolean {
+  const upper = cleanText(profile).toUpperCase();
+  return /\bSCREW\b.*\bFIX(?:ED)?\b|\bFIX(?:ED)?\b.*\bSCREW\b/.test(upper);
+}
+
+function kdXPartsMultiplier(profile: string): number {
+  return isScrewFixProfile(profile) ? 7 : 4;
+}
+
 function addManualTotals(
   totals: ManualTotals,
   detail: DetailLine,
@@ -1727,7 +1770,7 @@ function addManualTotals(
   }
 
   const materialIsOther = cleanText(detail.material).toLowerCase() === "other";
-  if (!materialIsOther && (numberValue(detail.revealWidth) ?? 0) > 1024) {
+  if (!materialIsOther && (numberValue(detail.revealWidth) ?? 0) > OVER_SIZE_REVEAL_WIDTH_THRESHOLD) {
     totals.overSizeQty += quantity;
   }
 
@@ -1745,7 +1788,7 @@ function addManualTotals(
       totals.v += quantity * (hinge + striker + sill);
     }
     if (goods === "KD") {
-      totals.x += quantity * 4;
+      totals.x += quantity * kdXPartsMultiplier(detail.profile);
     }
   }
   totals.v += detail.vPartsExtra ?? 0;

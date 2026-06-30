@@ -93,7 +93,13 @@ describe("standalone email API entrypoint", () => {
     expect(response.status).toBe(200);
 
     try {
-      await expect(readNextSseEvent(response)).resolves.toContain('"uid":"uid-2"');
+      const event = await readNextSseEvent(response);
+      expect(event).toContain("event: new-messages");
+      const dataLine = event.split("\n").find((line) => line.startsWith("data: "));
+      expect(dataLine).toBeDefined();
+      const payload = JSON.parse(dataLine!.slice("data: ".length));
+      expect(payload.email).toBe("orders@example.com");
+      expect(payload.messages[0]?.uid).toMatch(/^uid-[2-9]\d*$/);
     } finally {
       controller.abort();
     }

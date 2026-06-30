@@ -721,6 +721,23 @@ def test_standard_worksheet_hinge_qty_is_not_over_size_width(tmp_path: Path) -> 
     assert row.values[7] is None
 
 
+def test_standard_worksheet_reveal_width_uses_1220_over_size_threshold(tmp_path: Path) -> None:
+    wb = worksheet_book()
+    ws = wb["Worksheet"]
+    rows = {
+        11: ["1.05mm Zincanneal", "", 1, "Modern", "114", 2060, 1203, "RIGHT", 4, "WELDED", "-", "-"],
+        12: ["1.05mm Zincanneal", "", 2, "Modern", "114", 2060, 1220, "LEFT", 4, "WELDED", "-", "-"],
+        13: ["1.05mm Zincanneal", "", 3, "Modern", "114", 2060, 1221, "RIGHT", 4, "WELDED", "-", "-"],
+    }
+    for row_idx, values in rows.items():
+        for col, value in enumerate(values, start=1):
+            ws.cell(row_idx, col).value = value
+
+    row = extract.extract_workbook(save_workbook(wb, tmp_path / "worksheet-reveal-threshold.xlsx"), infer_manual=True)
+
+    assert row.values[7] == 3
+
+
 def test_standard_worksheet_scans_material_from_zero_qty_rows_and_notes(tmp_path: Path) -> None:
     wb = worksheet_book()
     ws = wb["Worksheet"]
@@ -736,6 +753,72 @@ def test_standard_worksheet_scans_material_from_zero_qty_rows_and_notes(tmp_path
     row = extract.extract_workbook(save_workbook(wb, tmp_path / "worksheet-zero-material.xlsx"), infer_manual=True)
 
     assert row.values[9] == "1.2Z"
+
+
+def test_standard_worksheet_screw_fix_kd_uses_seven_x_parts_per_qty(tmp_path: Path) -> None:
+    wb = worksheet_book()
+    ws = wb["Worksheet"]
+    rows = {
+        11: [
+            "1.05mm Zincanneal",
+            "",
+            1,
+            "Modern Knock Down - Screw Fix",
+            "114",
+            2060,
+            723,
+            "LEFT",
+            2,
+            "WELDED",
+            "S1",
+            1000,
+            "NO",
+            "NO",
+            "NO",
+        ],
+        12: [
+            "1.05mm Zincanneal",
+            "",
+            2,
+            "Modern Knock Down - Screw Fix",
+            "114",
+            2060,
+            723,
+            "LEFT WC",
+            2,
+            "WELDED",
+            "S1",
+            1000,
+            "NO",
+            "NO",
+            "NO",
+        ],
+        13: [
+            "1.05mm Zincanneal",
+            "",
+            3,
+            "Modern Knock Down - Screw Fix",
+            "114",
+            2060,
+            823,
+            "RIGHT",
+            2,
+            "WELDED",
+            "S1",
+            1000,
+            "NO",
+            "NO",
+            "NO",
+        ],
+    }
+    for row_idx, values in rows.items():
+        for col, value in enumerate(values, start=1):
+            ws.cell(row_idx, col).value = value
+
+    row = extract.extract_workbook(save_workbook(wb, tmp_path / "worksheet-kd-screw-fix.xlsx"), infer_manual=True)
+
+    assert row.values[11] == "KD"
+    assert row.values[23] == 42
 
 
 def test_standard_worksheet_plain_hinge_stays_in_v_bucket(tmp_path: Path) -> None:
@@ -1175,6 +1258,40 @@ def thomas_sheet1_knockdown_cavity_book(delivery_date: dt.datetime) -> Workbook:
         for col, value in enumerate(values, start=1):
             ws.cell(row_idx, col).value = value
     return wb
+
+
+def test_sheet1_reveal_width_1203_is_not_over_size(tmp_path: Path) -> None:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Sheet1"
+    ws["A1"] = "Job 30095"
+    ws["A6"] = "Material"
+    ws["B6"] = "1.05mm Zincanneal"
+    headers = [
+        "Door #",
+        "PROFILE",
+        "OVERALL HEIGHT",
+        "REVEAL WIDTH",
+        "HAND",
+        "HINGE QTY",
+        "WELDED HINGES",
+        "STRIKER TYPE",
+        "STRIKER HEIGHT",
+    ]
+    for col, value in enumerate(headers, start=1):
+        ws.cell(12, col).value = value
+    rows = {
+        13: ["D1", "A", 2229, 1203, "RIGHT", 4, "100X75X1.6", "-", "-"],
+        14: ["D2", "A", 2229, 1220, "LEFT", 4, "100X75X1.6", "-", "-"],
+        15: ["D3", "A", 2229, 1221, "RIGHT", 4, "100X75X1.6", "-", "-"],
+    }
+    for row_idx, values in rows.items():
+        for col, value in enumerate(values, start=1):
+            ws.cell(row_idx, col).value = value
+
+    row = extract.extract_workbook(save_workbook(wb, tmp_path / "sheet1-reveal-threshold.xlsx"), infer_manual=True)
+
+    assert row.values[7] == 1
 
 
 def test_sheet1_thomas_early_knockdown_cavity_batch_matches_track(tmp_path: Path) -> None:
@@ -1757,7 +1874,7 @@ def test_sheet1_kd_abbreviation_maps_to_kd_goods(tmp_path: Path) -> None:
     row = extract.extract_workbook(save_workbook(wb, tmp_path / "sheet1-kd-code.xlsx"), infer_manual=True)
 
     assert row.values[10:12] == [1, "KD"]
-    assert row.values[19:24] == [0, 6, 4, None, 4]
+    assert row.values[19:24] == [0, 7, 4, None, 7]
 
 
 def test_sheet1_head_only_replacement_rows_do_not_count_as_kd_goods(tmp_path: Path) -> None:
@@ -1832,7 +1949,7 @@ def main_sheet_book() -> Workbook:
     return wb
 
 
-def test_main_sheet_commercial_widths_over_threshold_count_oversize(tmp_path: Path) -> None:
+def test_main_sheet_commercial_widths_use_reveal_1220_over_size_threshold(tmp_path: Path) -> None:
     wb = main_sheet_book()
     ws = wb["Main Sheet"]
     rows = {
@@ -1845,7 +1962,7 @@ def test_main_sheet_commercial_widths_over_threshold_count_oversize(tmp_path: Pa
 
     row = extract.extract_workbook(save_workbook(wb, tmp_path / "main-profile.xlsx"), infer_manual=True)
 
-    assert row.values[7] == 2
+    assert row.values[7] == 1
     assert row.values[10:12] == [2, "COMMERCIAL"]
     assert row.values[19:24] == [3, 18, 1, 12, None]
 

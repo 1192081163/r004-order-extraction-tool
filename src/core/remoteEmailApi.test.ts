@@ -3,13 +3,14 @@ import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-import { afterEach, describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
 
 import { loadRemoteEmailApiConfig, RemoteEmailApiClient } from "./remoteEmailApi.js";
 
 let activeServer: Server | undefined;
 
 afterEach(async () => {
+  vi.unstubAllGlobals();
   if (!activeServer?.listening) {
     return;
   }
@@ -20,6 +21,25 @@ afterEach(async () => {
 });
 
 describe("remote email API client", () => {
+  test("wraps remote extraction network failures with clear message", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("fetch failed");
+      }),
+    );
+    const client = new RemoteEmailApiClient({ baseUrl: "http://127.0.0.1:9", token: "api-token" });
+
+    await expect(
+      client.extractEmail({
+        email: "orders@example.com",
+        authCode: "mail-auth-code",
+        messageUids: ["123"],
+        hours: 24,
+      }),
+    ).rejects.toThrow("无法连接远程邮件服务 http://127.0.0.1:9，请检查服务地址、网络连接或远程服务是否已启动。");
+  });
+
   test("posts mailbox credentials to the remote message endpoint", async () => {
     const received: Array<{ url?: string; authorization?: string; body: unknown }> = [];
     const baseUrl = await listenWithJsonHandler(async (request, body) => {
