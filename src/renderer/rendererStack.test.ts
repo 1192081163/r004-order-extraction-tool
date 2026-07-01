@@ -55,6 +55,7 @@ describe("renderer React stack", () => {
     expect(appSource).toContain("候选邮件");
     expect(appSource).toContain("Excel 候选附件");
     expect(appSource).toContain("提取选中 ${selectedExtractableUids.length} 封");
+    expect(appSource).toContain("正在下载选中邮件附件");
     expect(appSource).toContain("失败原因");
     expect(appSource).toContain("resultFailures");
     expect(appSource).toContain("订单提取结果");

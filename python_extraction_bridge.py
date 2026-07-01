@@ -33,11 +33,29 @@ def result_to_json(result: desktop_runner.ExtractionResult) -> dict[str, Any]:
     }
 
 
+def progress_to_jsonl(index: int, total: int, path: Path, status: str) -> None:
+    print(
+        json.dumps(
+            {
+                "type": "progress",
+                "index": index,
+                "total": total,
+                "filename": path.name,
+                "status": status,
+            },
+            ensure_ascii=False,
+        ),
+        file=sys.stderr,
+        flush=True,
+    )
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run order extraction with the Python rules engine.")
+    parser = argparse.ArgumentParser(description="Run order extraction rules engine.")
     parser.add_argument("--recursive", action="store_true")
     parser.add_argument("--infer-manual", dest="infer_manual", action="store_true", default=True)
     parser.add_argument("--no-infer-manual", dest="infer_manual", action="store_false")
+    parser.add_argument("--progress-jsonl", action="store_true")
     parser.add_argument("paths", nargs="+")
     return parser.parse_args(argv)
 
@@ -48,6 +66,7 @@ def main(argv: list[str] | None = None) -> int:
         [Path(item) for item in args.paths],
         recursive=args.recursive,
         infer_manual=args.infer_manual,
+        progress=progress_to_jsonl if args.progress_jsonl else None,
     )
     print(json.dumps(result_to_json(result), ensure_ascii=False, default=str))
     return 0

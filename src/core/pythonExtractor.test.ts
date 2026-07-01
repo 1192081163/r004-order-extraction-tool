@@ -62,4 +62,20 @@ describe("python order extraction bridge", () => {
     expect(await stat(result.outputs.xlsxOutput)).toBeTruthy();
     expect(await stat(result.outputs.auditOutput)).toBeTruthy();
   });
+
+  test("forwards Python file progress events", async () => {
+    const filePath = path.join(tempRoot, "29698 python progress.xlsx");
+    await makeWorksheetOrder(filePath);
+    const progressEvents: Array<{ index: number; total: number; filename: string; status: string }> = [];
+
+    await runPythonOrderExtraction([filePath], {
+      inferManual: true,
+      progress: (event) => progressEvents.push(event),
+    });
+
+    expect(progressEvents).toEqual([
+      { index: 1, total: 1, filename: path.basename(filePath), status: "running" },
+      { index: 1, total: 1, filename: path.basename(filePath), status: "completed" },
+    ]);
+  });
 });

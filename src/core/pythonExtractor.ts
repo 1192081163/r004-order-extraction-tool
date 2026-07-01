@@ -1,13 +1,11 @@
-import { execFile } from "node:child_process";
+import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { promisify } from "node:util";
 
 import type { RunExtractionOptions } from "./orderExtractor.js";
-import type { ExtractionResult } from "../shared/types.js";
+import type { ExtractionResult, ProgressEvent, ProgressStatus } from "../shared/types.js";
 
-const execFileAsync = promisify(execFile);
 const moduleDir = path.dirname(fileURLToPath(import.meta.url));
 
 interface PythonCommand {
@@ -24,22 +22,136 @@ export async function runPythonOrderExtraction(
   const command = resolvePythonCommand();
   const args = [
     ...command.argsPrefix,
+    "--progress-jsonl",
     ...(options.recursive ? ["--recursive"] : []),
     options.inferManual ?? true ? "--infer-manual" : "--no-infer-manual",
     ...paths,
   ];
 
-  try {
-    const { stdout } = await execFileAsync(command.command, args, {
-      cwd: resolvePythonExecutionCwd(command.command),
-      maxBuffer: 50 * 1024 * 1024,
+  return runPythonCommand(command.command, args, resolvePythonExecutionCwd(command.command), options.progress);
+}
+
+function runPythonCommand(
+  command: string,
+  args: string[],
+  cwd: string,
+  progress?: (event: ProgressEvent) => void,
+): Promise<ExtractionResult> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { cwd });
+    const stdoutChunks: Buffer[] = [];
+    const stderrLines: string[] = [];
+    let stderrRemainder = "";
+    let settled = false;
+
+    function fail(error: Error): void {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    }
+
+    child.stdout?.on("data", (chunk: Buffer) => {
+      stdoutChunks.push(chunk);
     });
-    return JSON.parse(stdout) as ExtractionResult;
-  } catch (error) {
-    const details = error && typeof error === "object" && "stderr" in error ? String(error.stderr).trim() : "";
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(details ? `Python extraction failed: ${details}` : `Python extraction failed: ${message}`);
+
+    child.stderr?.on("data", (chunk: Buffer) => {
+      stderrRemainder = readStderrLines(`${stderrRemainder}${chunk.toString("utf8")}`, progress, stderrLines);
+    });
+
+    child.on("error", (error) => {
+      fail(new Error(`Python extraction failed: ${error.message}`));
+    });
+
+    child.on("close", (code) => {
+      if (settled) return;
+      if (stderrRemainder.trim()) {
+        handleStderrLine(stderrRemainder, progress, stderrLines);
+      }
+
+      const stderr = stderrLines.join("\n").trim();
+      if (code !== 0) {
+        fail(new Error(stderr ? `Python extraction failed: ${stderr}` : `Python extraction failed with exit code ${code}`));
+        return;
+      }
+
+      try {
+        const result = JSON.parse(Buffer.concat(stdoutChunks).toString("utf8")) as ExtractionResult;
+        settled = true;
+        resolve(result);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        fail(new Error(stderr ? `Python extraction failed: ${stderr}` : `Python extraction failed: ${message}`));
+      }
+    });
+  });
+}
+
+function readStderrLines(
+  text: string,
+  progress: ((event: ProgressEvent) => void) | undefined,
+  stderrLines: string[],
+): string {
+  const lines = text.split(/\r?\n/);
+  const remainder = lines.pop() ?? "";
+  for (const line of lines) {
+    handleStderrLine(line, progress, stderrLines);
   }
+  return remainder;
+}
+
+function handleStderrLine(
+  line: string,
+  progress: ((event: ProgressEvent) => void) | undefined,
+  stderrLines: string[],
+): void {
+  if (!line.trim()) return;
+  if (readProgressLine(line, progress)) return;
+  stderrLines.push(line);
+}
+
+function readProgressLine(line: string, progress?: (event: ProgressEvent) => void): boolean {
+  let payload: unknown;
+  try {
+    payload = JSON.parse(line);
+  } catch {
+    return false;
+  }
+
+  if (!payload || typeof payload !== "object" || (payload as { type?: unknown }).type !== "progress") {
+    return false;
+  }
+
+  const event = toProgressEvent(payload);
+  if (event) progress?.(event);
+  return true;
+}
+
+function toProgressEvent(payload: unknown): ProgressEvent | null {
+  const item = payload as Record<string, unknown>;
+  const index = item.index;
+  const total = item.total;
+  const filename = item.filename;
+  const status = item.status;
+  if (
+    typeof index !== "number" ||
+    typeof total !== "number" ||
+    !Number.isInteger(index) ||
+    !Number.isInteger(total) ||
+    typeof filename !== "string" ||
+    !isProgressStatus(status)
+  ) {
+    return null;
+  }
+  return {
+    index,
+    total,
+    filename,
+    status,
+  };
+}
+
+function isProgressStatus(value: unknown): value is ProgressStatus {
+  return value === "running" || value === "completed" || value === "failed";
 }
 
 function resolvePythonCommand(): PythonCommand {

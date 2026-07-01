@@ -4,26 +4,25 @@ import path from "node:path";
 import { resolveInputPaths } from "./fileScanner.js";
 import { defaultOutputPaths } from "./outputPaths.js";
 import { sortExtractedRowsByIdealDate } from "./rowSorting.js";
-import { appConfigDir } from "./settings.js";
+import { appConfigDir, defaultEmailDownloadRoot } from "./settings.js";
 import type { EmailExtractionRequest, EmailExtractionResult, EmailListRequest, LocalExtractionRequest } from "./extractionService.js";
 import { writeAuditCsv, writeCsv, writeXlsx } from "./writers.js";
-import type { EmailListResult, EmailNewMessagesEvent, ExtractionResult, OutputPaths } from "../shared/types.js";
+import type { EmailListResult, EmailNewMessagesEvent, ExtractionResult } from "../shared/types.js";
 
 export interface RemoteEmailApiConfig {
   baseUrl: string;
   token?: string;
 }
 
+interface RemoteEmailApiClientOptions {
+  emailOutputRoot?: string;
+  now?: () => Date;
+}
+
 type EnvLike = Record<string, string | undefined>;
 
 const REMOTE_API_SETTINGS_FILE = "email_api_client.json";
 const PACKAGED_REMOTE_API_SETTINGS_FILE = path.join("config", "remote-email-api.json");
-const EMPTY_OUTPUTS: OutputPaths = {
-  outputDir: "",
-  csvOutput: "",
-  xlsxOutput: "",
-  auditOutput: "",
-};
 
 export function defaultRemoteEmailApiSettingsPath(): string {
   return path.join(appConfigDir(), REMOTE_API_SETTINGS_FILE);
@@ -62,10 +61,14 @@ export async function loadRemoteEmailApiConfig(
 export class RemoteEmailApiClient {
   private readonly baseUrl: string;
   private readonly token?: string;
+  private readonly emailOutputRoot?: string;
+  private readonly now: () => Date;
 
-  constructor(config: RemoteEmailApiConfig) {
+  constructor(config: RemoteEmailApiConfig, options: RemoteEmailApiClientOptions = {}) {
     this.baseUrl = config.baseUrl.replace(/\/+$/, "");
     this.token = optionalTrimmed(config.token);
+    this.emailOutputRoot = options.emailOutputRoot;
+    this.now = options.now ?? (() => new Date());
   }
 
   async listEmails(request: EmailListRequest): Promise<EmailListResult> {
@@ -74,11 +77,18 @@ export class RemoteEmailApiClient {
 
   async extractEmail(request: EmailExtractionRequest): Promise<EmailExtractionResult> {
     const result = await this.post<EmailExtractionResult>("/api/email/extract", request);
+    const rows = sortExtractedRowsByIdealDate(result.extraction.rows);
+    const outputs = defaultOutputPaths(timestampedEmailOutputDir(this.now(), this.emailOutputRoot));
+    await writeCsv(rows, outputs.csvOutput);
+    await writeXlsx(rows, outputs);
+    await writeAuditCsv(rows, outputs.auditOutput);
+
     return {
       ...result,
       extraction: {
         ...result.extraction,
-        outputs: { ...EMPTY_OUTPUTS },
+        rows,
+        outputs,
       },
     };
   }
@@ -183,6 +193,19 @@ async function fetchRemote(url: string, init: RequestInit, baseUrl: string): Pro
 function optionalTrimmed(value: string | undefined): string | undefined {
   const trimmed = value?.trim();
   return trimmed || undefined;
+}
+
+function timestampedEmailOutputDir(now: Date, root = defaultEmailDownloadRoot()): string {
+  const stamp = [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, "0"),
+    String(now.getDate()).padStart(2, "0"),
+    "-",
+    String(now.getHours()).padStart(2, "0"),
+    String(now.getMinutes()).padStart(2, "0"),
+    String(now.getSeconds()).padStart(2, "0"),
+  ].join("");
+  return path.join(root, stamp);
 }
 
 async function readSseEvents(

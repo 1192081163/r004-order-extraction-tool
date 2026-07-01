@@ -370,6 +370,8 @@ function App() {
     await runUiTask(async () => {
       resetResult();
       appendLog(`已选择 ${messageUids.length} 封邮件`);
+      setSummary("正在下载选中邮件附件");
+      appendLog("正在下载选中邮件附件");
       const result = await api.extractEmail({
         email,
         authCode,

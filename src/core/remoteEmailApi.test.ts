@@ -78,7 +78,8 @@ describe("remote email API client", () => {
     ]);
   });
 
-  test("clears server-side output paths from remote extraction results", async () => {
+  test("writes remote email extraction outputs locally", async () => {
+    const tempDir = await mkdtemp(path.join(tmpdir(), "remote-email-extract-"));
     const baseUrl = await listenWithJsonHandler(async () => ({
       emailFetch: {
         files: ["/server/downloads/order.xlsx"],
@@ -100,7 +101,7 @@ describe("remote email API client", () => {
       },
     }));
 
-    const client = new RemoteEmailApiClient({ baseUrl });
+    const client = new RemoteEmailApiClient({ baseUrl }, { emailOutputRoot: tempDir, now: () => new Date(2026, 5, 24, 10, 11, 12) });
     const result = await client.extractEmail({
       email: "orders@example.com",
       authCode: "mail-auth-code",
@@ -110,12 +111,10 @@ describe("remote email API client", () => {
 
     expect(result.emailFetch.attachmentCount).toBe(1);
     expect(result.extraction.rows).toHaveLength(1);
-    expect(result.extraction.outputs).toEqual({
-      outputDir: "",
-      csvOutput: "",
-      xlsxOutput: "",
-      auditOutput: "",
-    });
+    expect(result.extraction.outputs.outputDir).toBe(path.join(tempDir, "20260624-101112", "order_extraction_output"));
+    await expect(readFile(result.extraction.outputs.csvOutput, "utf8")).resolves.toContain("2026-06-24");
+    await expect(readFile(result.extraction.outputs.auditOutput, "utf8")).resolves.toContain("order.xlsx");
+    await expect(readFile(result.extraction.outputs.xlsxOutput)).resolves.toBeTruthy();
   });
 
   test("uploads local files to remote extraction endpoint and writes local outputs", async () => {
