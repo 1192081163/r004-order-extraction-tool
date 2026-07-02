@@ -67,6 +67,7 @@
     "directories": {
       "output": "release"
     },
+    "afterPack": "scripts/sign-mac-app.mjs",
     "files": [
       "dist/**/*",
       "!dist/**/*.test.js",

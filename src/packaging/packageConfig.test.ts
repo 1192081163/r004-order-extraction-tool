@@ -26,6 +26,7 @@ describe("Electron packaging configuration", () => {
       include?: string[];
       exclude?: string[];
     };
+    const macSignScript = await readFile(path.join(root, "scripts/sign-mac-app.mjs"), "utf8");
 
     expect(packageJson.name).toBe("orderflow-desktop");
     expect(packageJson.description).toBe("Electron TypeScript orderflow desktop application");
@@ -56,6 +57,7 @@ describe("Electron packaging configuration", () => {
       appId: "com.ausmet.orderflow.desktop",
       productName: "订单整理助手",
       directories: { output: "release" },
+      afterPack: "scripts/sign-mac-app.mjs",
       files: ["dist/**/*", "!dist/**/*.test.js", "package.json"],
       extraResources: [
         { from: "python-helper", to: "python-helper" },
@@ -87,6 +89,9 @@ describe("Electron packaging configuration", () => {
       include: ["src/core/**/*.ts", "src/main/**/*.ts", "src/preload/**/*.cts", "src/server/**/*.ts", "src/shared/**/*.ts"],
       exclude: ["src/**/*.test.ts", "src/**/*.test.tsx"],
     });
+    expect(macSignScript).toContain('electronPlatformName !== "darwin"');
+    expect(macSignScript).toContain('execFileSync("codesign"');
+    expect(macSignScript).toContain('"--force", "--deep", "--sign", "-"');
   });
 
   test("release workflow builds Windows and macOS Electron artifacts", async () => {
